@@ -59,3 +59,21 @@ export class MemberNotFoundError extends AppError {
     super(404, 'MemberNotFound', 'That person is not a member of this household');
   }
 }
+
+export class ZoneNotFoundError extends AppError {
+  constructor() {
+    super(404, 'ZoneNotFound', 'That zone was not found');
+  }
+}
+
+export class RootZoneImmutableError extends AppError {
+  constructor() {
+    super(400, 'RootZoneImmutable', 'The Household zone can’t be removed or moved');
+  }
+}
+
+export class InvalidZoneMoveError extends AppError {
+  constructor() {
+    super(400, 'InvalidZoneMove', 'A zone can’t be moved into itself or one of its own zones');
+  }
+}

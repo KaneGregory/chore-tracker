@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, unique, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 export const HOUSEHOLD_ROLES = ['member', 'head'] as const;
 export type HouseholdRole = (typeof HOUSEHOLD_ROLES)[number];
@@ -32,6 +32,20 @@ export const householdMembers = sqliteTable(
   },
   (table) => [unique().on(table.userId, table.householdId)],
 );
+
+export const zones = sqliteTable('zones', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  householdId: integer('household_id')
+    .notNull()
+    .references(() => households.id, { onDelete: 'cascade' }),
+  // NULL only for a household's root zone ("The Household" itself) — every other
+  // zone has a parent, and removing a parent cascades to its whole subtree.
+  parentZoneId: integer('parent_zone_id').references((): AnySQLiteColumn => zones.id, {
+    onDelete: 'cascade',
+  }),
+  name: text('name').notNull(),
+  createdAt: integer('created_at').notNull(),
+});
 
 export const sessions = sqliteTable('sessions', {
   token: text('token').primaryKey(),

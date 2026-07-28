@@ -461,3 +461,78 @@ a {
 .role-badge span {
   margin-right: 2px;
 }
+
+.section-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 18px 0 4px;
+}
+
+/* ---------- zone tree ---------- */
+
+.zone-tree,
+.zone-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.zone-children {
+  margin-top: 4px;
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+
+.zone-item {
+  margin: 4px 0;
+}
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.zone-name {
+  font-weight: 600;
+}
+
+.zone-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.zone-actions .btn-text {
+  padding: 2px 6px;
+  font-size: 0.78rem;
+}
+
+.zone-inline-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+  font-size: 0.85rem;
+}
+
+.zone-inline-form input,
+.zone-inline-form select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.zone-inline-form .btn-pill-outline {
+  padding: 4px 12px;
+  font-size: 0.8rem;
+}

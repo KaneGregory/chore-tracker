@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const idParam = z.coerce.number().int().positive();
+export const idParam = z.coerce.number().int().positive();
 
 export const householdParamsSchema = z.object({
   householdId: idParam,

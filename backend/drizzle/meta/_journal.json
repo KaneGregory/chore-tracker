@@ -15,6 +15,13 @@
       "when": 1785264538792,
       "tag": "0001_absurd_wolfpack",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785272275936,
+      "tag": "0002_cuddly_tarantula",
+      "breakpoints": true
     }
   ]
 }

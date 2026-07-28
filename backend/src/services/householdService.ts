@@ -1,20 +1,13 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { householdMembers, users } from '../db/schema.js';
-import { HouseholdNotFoundError, MemberNotFoundError, NotHeadOfHouseholdError } from '../errors.js';
+import { MemberNotFoundError } from '../errors.js';
+import { getMembership, requireHeadMembership, requireMembership } from './membershipAuth.js';
 
 export interface HouseholdMember {
   id: number;
   email: string;
   role: 'member' | 'head';
-}
-
-function getMembership(householdId: number, userId: number) {
-  return db
-    .select({ role: householdMembers.role })
-    .from(householdMembers)
-    .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)))
-    .get();
 }
 
 function listMembers(householdId: number): HouseholdMember[] {
@@ -31,9 +24,7 @@ export function getMembersForRequester(
   householdId: number,
   requestingUserId: number,
 ): HouseholdMember[] {
-  const requesterMembership = getMembership(householdId, requestingUserId);
-  if (!requesterMembership) throw new HouseholdNotFoundError();
-
+  requireMembership(householdId, requestingUserId);
   return listMembers(householdId);
 }
 
@@ -42,9 +33,7 @@ export function promoteMember(
   requestingUserId: number,
   targetUserId: number,
 ): HouseholdMember[] {
-  const requesterMembership = getMembership(householdId, requestingUserId);
-  if (!requesterMembership) throw new HouseholdNotFoundError();
-  if (requesterMembership.role !== 'head') throw new NotHeadOfHouseholdError();
+  requireHeadMembership(householdId, requestingUserId);
 
   const targetMembership = getMembership(householdId, targetUserId);
   if (!targetMembership) throw new MemberNotFoundError();

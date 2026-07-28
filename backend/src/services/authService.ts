@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { households, householdMembers, sessions, users } from '../db/schema.js';
+import { households, householdMembers, sessions, users, zones } from '../db/schema.js';
 import type { HouseholdRole } from '../db/schema.js';
 import type { Transaction } from '../db/client.js';
 import {
@@ -84,6 +84,16 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
     if (input.household.mode === 'create') {
       household = insertHouseholdWithUniqueJoinCode(tx, input.household.name, now);
       role = 'head';
+      // Every household starts with one unremovable root zone representing
+      // the household itself, which every other zone nests under.
+      tx.insert(zones)
+        .values({
+          householdId: household.id,
+          parentZoneId: null,
+          name: household.name,
+          createdAt: now,
+        })
+        .run();
     } else {
       const joinCode = normalizeJoinCode(input.household.joinCode);
       const found = tx.select().from(households).where(eq(households.joinCode, joinCode)).get();

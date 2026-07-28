@@ -29,6 +29,25 @@ To help the members of a household to manage chores.
   user who isn't a member of a household gets the same generic 404
   (`HouseholdNotFound`) whether the household doesn't exist or they're just not in
   it — same "don't leak existence" pattern as `InvalidJoinCode`.
+* Households have a tree of "zones" (`zones` table, self-referencing via
+  `parent_zone_id`) for organizing chores by area later — e.g. "Upstairs" containing
+  "Bedroom". Every household gets one root zone (named after the household,
+  `parent_zone_id IS NULL`) created alongside it, which can never be removed or
+  moved — enforced in `backend/src/services/zoneService.ts`, not the DB, since
+  nothing stops a second root at the schema level (root-ness is just "this household's
+  one zone with no parent," established once at creation and never re-created).
+  Removing a zone cascades to its descendants via `ON DELETE CASCADE` on
+  `parent_zone_id` — SQLite chains this recursively as long as `foreign_keys = ON`
+  (it is, see `db/client.ts`), so deleting a zone deletes its whole subtree in one
+  statement, no application-level recursion needed. Moving (reparenting) a zone
+  validates against cycles by walking the subtree of the zone being moved and
+  rejecting if the proposed new parent is in it (covers moving into itself too, since
+  a zone is a member of its own subtree). View = any member; create/remove/move =
+  Head of Household only, same split as the members list. The shared
+  "is this user a member / a head of this household" check lives in
+  `backend/src/services/membershipAuth.ts`, reused by both `householdService.ts` and
+  `zoneService.ts` — put any new household-scoped authorization there rather than
+  re-deriving it.
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
   for installability (manifest + service worker).
@@ -89,6 +108,10 @@ Run from within `backend/` or `frontend/` unless noted:
   same leak on login/join.
 * No demotion (head → member) and no way to remove a member from a household — only
   promotion exists, per what was actually asked for.
+* Zones can't be renamed after creation — only create/remove/move were asked for.
+* Removing a zone cascades to everything nested inside it, with no undo — an inline
+  "are you sure" confirmation guards this in the UI, but there's no soft-delete or
+  recovery if someone confirms by mistake.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a
