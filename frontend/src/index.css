@@ -392,6 +392,14 @@ a {
   font-size: 1.1rem;
 }
 
+.stamp-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0 8px;
+}
+
 .stamp {
   display: inline-block;
   font-family: var(--font-mono);
@@ -402,7 +410,11 @@ a {
   border-radius: var(--radius-sm);
   padding: 6px 14px;
   transform: rotate(-2deg);
-  margin: 6px 0 8px;
+}
+
+.btn-pill-outline.copied {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
 }
 
 .stamp-caption {
