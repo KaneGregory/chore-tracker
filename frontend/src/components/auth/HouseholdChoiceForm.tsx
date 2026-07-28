@@ -14,24 +14,34 @@ export function HouseholdChoiceForm({ submitting, onSubmit, onBack }: HouseholdC
 
   return (
     <div>
-      <div role="tablist" aria-label="Household choice">
+      <div className="choice-grid" role="radiogroup" aria-label="Household choice">
         <button
           type="button"
-          role="tab"
-          aria-selected={mode === 'create'}
+          role="radio"
+          aria-checked={mode === 'create'}
           disabled={submitting}
+          className={`choice-card mode-create${mode === 'create' ? ' selected' : ''}`}
           onClick={() => setMode('create')}
         >
-          Create a household
+          <span className="choice-card-icon" aria-hidden="true">
+            🏠
+          </span>
+          <span className="choice-card-title">Start a household</span>
+          <span className="choice-card-desc">Give it a name, invite everyone else</span>
         </button>
         <button
           type="button"
-          role="tab"
-          aria-selected={mode === 'join'}
+          role="radio"
+          aria-checked={mode === 'join'}
           disabled={submitting}
+          className={`choice-card mode-join${mode === 'join' ? ' selected' : ''}`}
           onClick={() => setMode('join')}
         >
-          Join a household
+          <span className="choice-card-icon" aria-hidden="true">
+            🔑
+          </span>
+          <span className="choice-card-title">Join a household</span>
+          <span className="choice-card-desc">Use the code someone shared with you</span>
         </button>
       </div>
 
@@ -47,9 +57,11 @@ export function HouseholdChoiceForm({ submitting, onSubmit, onBack }: HouseholdC
         />
       )}
 
-      <button type="button" disabled={submitting} onClick={onBack}>
-        Back
-      </button>
+      <div className="card-footer">
+        <button type="button" className="btn btn-text" disabled={submitting} onClick={onBack}>
+          Back
+        </button>
+      </div>
     </div>
   );
 }

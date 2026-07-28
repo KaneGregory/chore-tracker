@@ -8,12 +8,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
       manifest: {
         name: 'Chore Tracker',
         short_name: 'Chores',
         description: 'Track and share household chores',
-        theme_color: '#6b3bff',
-        background_color: '#16171d',
+        theme_color: '#ff6f5e',
+        background_color: '#fff3d6',
         display: 'standalone',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { RegistrationForm } from '../components/auth/RegistrationForm';
 import { HouseholdChoiceForm } from '../components/auth/HouseholdChoiceForm';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -35,21 +35,34 @@ export function RegisterPage() {
   }
 
   return (
-    <div>
-      <h1>Create your account</h1>
-      <ErrorBanner message={error} />
+    <div className="card">
       {step === 'credentials' ? (
-        <RegistrationForm
-          initialEmail={email}
-          initialPassword={password}
-          onNext={handleCredentialsNext}
-        />
+        <div key="credentials" className="card-step">
+          <h1>Let&rsquo;s get you set up</h1>
+          <p className="card-eyebrow">You&rsquo;ll pick a household next.</p>
+          <ErrorBanner message={error} />
+          <RegistrationForm
+            initialEmail={email}
+            initialPassword={password}
+            onNext={handleCredentialsNext}
+          />
+        </div>
       ) : (
-        <HouseholdChoiceForm
-          submitting={submitting}
-          onSubmit={handleHouseholdSubmit}
-          onBack={() => setStep('credentials')}
-        />
+        <div key="household" className="card-step">
+          <h1>Now, your household</h1>
+          <p className="card-eyebrow">Every chore belongs to one.</p>
+          <ErrorBanner message={error} />
+          <HouseholdChoiceForm
+            submitting={submitting}
+            onSubmit={handleHouseholdSubmit}
+            onBack={() => setStep('credentials')}
+          />
+        </div>
+      )}
+      {step === 'credentials' && (
+        <p className="card-footer">
+          Already have an account? <Link to="/login">Log in</Link>
+        </p>
       )}
     </div>
   );

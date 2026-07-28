@@ -39,7 +39,9 @@ describe('POST /api/auth/register', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.user.email).toBe('alice@example.com');
-    expect(response.body.households).toEqual([{ id: expect.any(Number), name: 'The Smiths' }]);
+    expect(response.body.households).toEqual([
+      { id: expect.any(Number), name: 'The Smiths', joinCode: expect.any(String) },
+    ]);
     expect(response.headers['set-cookie']).toBeDefined();
   });
 
@@ -86,12 +88,7 @@ describe('POST /api/auth/register', () => {
         household: { mode: 'create', name: 'Dave House' },
       });
 
-    // The join code isn't returned by the API by design (see InvalidJoinCode's
-    // deliberately generic error), so read it back from the DB directly for this test.
-    const row = sqlite
-      .prepare('SELECT join_code FROM households WHERE id = ?')
-      .get(created.body.households[0].id) as { join_code: string };
-    const lowercased = row.join_code.toLowerCase();
+    const lowercased: string = created.body.households[0].joinCode.toLowerCase();
     const lowercaseHyphenatedCode = `${lowercased.slice(0, 4)}-${lowercased.slice(4)}`;
 
     const response = await request(app)

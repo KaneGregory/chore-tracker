@@ -3,7 +3,8 @@ export function ErrorBanner({ message }: { message: string | null }) {
 
   return (
     <div role="alert" className="error-banner">
-      {message}
+      <span aria-hidden="true">⚠</span>
+      <span>{message}</span>
     </div>
   );
 }

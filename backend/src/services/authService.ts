@@ -28,6 +28,7 @@ export interface PublicUser {
 export interface PublicHousehold {
   id: number;
   name: string;
+  joinCode: string;
 }
 
 export interface AuthResult {
@@ -95,7 +96,7 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
 
   return {
     user: { id: user.id, email: user.email },
-    households: [{ id: household.id, name: household.name }],
+    households: [{ id: household.id, name: household.name, joinCode: household.joinCode }],
     token,
   };
 }
@@ -112,7 +113,7 @@ export async function login(input: LoginInput): Promise<AuthResult> {
   const expiresAt = now + SESSION_TTL_MS;
 
   const memberHouseholds = db
-    .select({ id: households.id, name: households.name })
+    .select({ id: households.id, name: households.name, joinCode: households.joinCode })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))
     .where(eq(householdMembers.userId, user.id))
@@ -141,7 +142,7 @@ export function getSessionUser(
   if (!user) return null;
 
   const memberHouseholds = db
-    .select({ id: households.id, name: households.name })
+    .select({ id: households.id, name: households.name, joinCode: households.joinCode })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))
     .where(eq(householdMembers.userId, user.id))

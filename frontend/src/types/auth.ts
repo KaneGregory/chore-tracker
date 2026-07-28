@@ -6,6 +6,7 @@ export interface User {
 export interface Household {
   id: number;
   name: string;
+  joinCode: string;
 }
 
 export type HouseholdChoice = { mode: 'create'; name: string } | { mode: 'join'; joinCode: string };

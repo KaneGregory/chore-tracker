@@ -43,7 +43,9 @@ export function RegistrationForm({ initialEmail, initialPassword, onNext }: Regi
         autoComplete="new-password"
         required
       />
-      <button type="submit">Next</button>
+      <button type="submit" className="btn btn-primary btn-block">
+        Continue
+      </button>
     </form>
   );
 }

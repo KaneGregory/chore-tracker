@@ -26,6 +26,15 @@ To help the members of a household to manage chores.
   backend refuses to start without `CORS_ORIGIN` set, because the `cors` package
   treats a falsy `origin` as `*`, which combined with `credentials: true` is a
   fail-open misconfiguration.
+* Visual design system lives entirely in `frontend/src/index.css` as CSS custom
+  properties on `:root` (palette, type, radius, shadow), with light/dark variants
+  under `@media (prefers-color-scheme: dark)`. Don't hardcode colors or fonts in
+  component files — reference the tokens (`var(--accent)`, `var(--font-display)`,
+  etc.) so a future palette/type change is a one-file edit. The display face
+  (`Fredoka`) is self-hosted at `frontend/public/fonts/` — not loaded from a CDN —
+  so it works offline once the service worker has precached it; it's included in
+  `vite.config.ts`'s `workbox.globPatterns` for that reason, don't drop `woff2` from
+  that list.
 
 ## All code should be
 
@@ -68,6 +77,13 @@ Run from within `backend/` or `frontend/` unless noted:
 * `EmailAlreadyRegistered` (409) reveals whether an email is already registered;
   `InvalidCredentials` and `InvalidJoinCode` are deliberately generic to avoid the
   same leak on login/join.
+
+Fixed during the UI pass: the household's join code was generated and stored but
+never returned by the API, so there was no way to actually invite anyone into a
+household you'd created. `PublicHousehold` (backend) and `Household` (frontend) now
+include `joinCode`; it's shown on the home page as the "stamp." A household's own
+join code is safe to show to any of its members — it's not treated as a secret from
+them, only from outsiders.
 
 ## Dependency vulnerabilities
 

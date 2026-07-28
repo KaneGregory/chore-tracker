@@ -7,11 +7,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="app-shell-header">
-        <span>Chore Tracker</span>
+        <span className="logo">
+          <span className="logo-mark" aria-hidden="true">
+            ✓
+          </span>
+          Chores
+        </span>
         {state.status === 'authenticated' && (
-          <div>
+          <div className="user-chip">
             <span>{state.user.email}</span>
-            <button type="button" onClick={() => void logout()}>
+            <button type="button" className="btn btn-pill-outline" onClick={() => void logout()}>
               Log out
             </button>
           </div>

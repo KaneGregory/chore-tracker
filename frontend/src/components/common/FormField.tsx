@@ -6,6 +6,7 @@ interface FormFieldProps {
   onChange: (value: string) => void;
   error?: string;
   autoComplete?: string;
+  placeholder?: string;
   required?: boolean;
 }
 
@@ -17,6 +18,7 @@ export function FormField({
   onChange,
   error,
   autoComplete,
+  placeholder,
   required,
 }: FormFieldProps) {
   return (
@@ -29,6 +31,7 @@ export function FormField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
+        placeholder={placeholder}
         required={required}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${name}-error` : undefined}

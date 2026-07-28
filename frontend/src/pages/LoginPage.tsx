@@ -24,12 +24,13 @@ export function LoginPage() {
   }
 
   return (
-    <div>
-      <h1>Log in</h1>
+    <div className="card">
+      <h1>Welcome back</h1>
+      <p className="card-eyebrow">Your chores missed you.</p>
       <ErrorBanner message={error} />
       <LoginForm submitting={submitting} onSubmit={handleSubmit} />
-      <p>
-        Need an account? <Link to="/register">Register</Link>
+      <p className="card-footer">
+        New here? <Link to="/register">Create an account</Link>
       </p>
     </div>
   );

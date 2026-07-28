@@ -21,9 +21,14 @@ export function JoinHouseholdForm({ submitting, onSubmit }: JoinHouseholdFormPro
         name="joinCode"
         value={joinCode}
         onChange={setJoinCode}
+        placeholder="e.g. F8XR-CK4R"
         required
       />
-      <button type="submit" disabled={submitting || joinCode.trim().length === 0}>
+      <button
+        type="submit"
+        className="btn btn-primary btn-block"
+        disabled={submitting || joinCode.trim().length === 0}
+      >
         {submitting ? 'Joining household…' : 'Join household'}
       </button>
     </form>

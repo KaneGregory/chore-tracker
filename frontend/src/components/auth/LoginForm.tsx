@@ -35,7 +35,7 @@ export function LoginForm({ submitting, onSubmit }: LoginFormProps) {
         autoComplete="current-password"
         required
       />
-      <button type="submit" disabled={submitting}>
+      <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
         {submitting ? 'Logging in…' : 'Log in'}
       </button>
     </form>

@@ -21,9 +21,14 @@ export function CreateHouseholdForm({ submitting, onSubmit }: CreateHouseholdFor
         name="householdName"
         value={name}
         onChange={setName}
+        placeholder="e.g. The Smiths"
         required
       />
-      <button type="submit" disabled={submitting || name.trim().length === 0}>
+      <button
+        type="submit"
+        className="btn btn-primary btn-block"
+        disabled={submitting || name.trim().length === 0}
+      >
         {submitting ? 'Creating account…' : 'Create household'}
       </button>
     </form>
