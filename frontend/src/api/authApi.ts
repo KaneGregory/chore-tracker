@@ -22,3 +22,10 @@ export function logout(): Promise<void> {
 export function getMe(): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/api/auth/me');
 }
+
+export async function isEmailAvailable(email: string): Promise<boolean> {
+  const response = await apiRequest<{ available: boolean }>(
+    `/api/auth/email-availability?email=${encodeURIComponent(email)}`,
+  );
+  return response.available;
+}

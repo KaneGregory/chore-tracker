@@ -1,11 +1,26 @@
 import { Router } from 'express';
 import { ValidationError, NotAuthenticatedError } from '../errors.js';
-import { loginSchema, registerSchema } from '../validation/authSchemas.js';
+import {
+  emailAvailabilityQuerySchema,
+  loginSchema,
+  registerSchema,
+} from '../validation/authSchemas.js';
 import * as authService from '../services/authService.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from '../constants.js';
 
 export const authRouter = Router();
+
+authRouter.get('/email-availability', (req, res, next) => {
+  const parsed = emailAvailabilityQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    next(new ValidationError('Invalid email', parsed.error.issues));
+    return;
+  }
+
+  const available = authService.isEmailAvailable(parsed.data.email);
+  res.status(200).json({ available });
+});
 
 authRouter.post('/register', async (req, res, next) => {
   const parsed = registerSchema.safeParse(req.body);

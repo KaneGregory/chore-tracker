@@ -53,6 +53,11 @@ function insertHouseholdWithUniqueJoinCode(tx: Transaction, name: string, now: n
   throw new Error('Failed to generate a unique household join code');
 }
 
+export function isEmailAvailable(email: string): boolean {
+  const existing = db.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
+  return !existing;
+}
+
 export async function register(input: RegisterInput): Promise<AuthResult> {
   const passwordHash = await hashPassword(input.password);
   const token = generateSessionToken();

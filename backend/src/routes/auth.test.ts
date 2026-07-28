@@ -27,6 +27,48 @@ function extractSessionCookie(response: request.Response): string {
   return cookie;
 }
 
+describe('GET /api/auth/email-availability', () => {
+  it('reports an unused email as available', async () => {
+    const response = await request(app).get(
+      '/api/auth/email-availability?email=unused@example.com',
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ available: true });
+  });
+
+  it('reports a registered email as unavailable, case- and whitespace-insensitively', async () => {
+    await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'henry@example.com',
+        password: 'correct-horse-battery',
+        household: { mode: 'create', name: 'Henry House' },
+      });
+
+    const response = await request(app).get(
+      '/api/auth/email-availability?email=%20Henry%40Example.com%20',
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ available: false });
+  });
+
+  it('rejects a malformed email with 400', async () => {
+    const response = await request(app).get('/api/auth/email-availability?email=not-an-email');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('rejects a missing email with 400', async () => {
+    const response = await request(app).get('/api/auth/email-availability');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+});
+
 describe('POST /api/auth/register', () => {
   it('registers a new user and creates a household', async () => {
     const response = await request(app)
