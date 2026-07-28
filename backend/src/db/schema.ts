@@ -1,5 +1,8 @@
 import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core';
 
+export const HOUSEHOLD_ROLES = ['member', 'head'] as const;
+export type HouseholdRole = (typeof HOUSEHOLD_ROLES)[number];
+
 export const households = sqliteTable('households', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
@@ -24,6 +27,7 @@ export const householdMembers = sqliteTable(
     householdId: integer('household_id')
       .notNull()
       .references(() => households.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: HOUSEHOLD_ROLES }).notNull().default('member'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [unique().on(table.userId, table.householdId)],

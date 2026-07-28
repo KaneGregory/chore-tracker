@@ -19,6 +19,16 @@ To help the members of a household to manage chores.
 * A user's household membership is a many-to-many join table (`household_members`),
   not a single FK on `users`, so a user can belong to multiple households without a
   future migration.
+* Household roles: `household_members.role` is `'member'` or `'head'` (Head of
+  Household). Whoever creates a household is its first head; whoever joins via code
+  starts as a plain member. Only a head can promote another member to head (one-way —
+  there's no demotion yet). Authorization for this lives in
+  `backend/src/services/householdService.ts`, not in routes or middleware: every
+  household-scoped action re-checks the requester's own membership row for that
+  specific household id, since role is per-household, not a global user property. A
+  user who isn't a member of a household gets the same generic 404
+  (`HouseholdNotFound`) whether the household doesn't exist or they're just not in
+  it — same "don't leak existence" pattern as `InvalidJoinCode`.
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
   for installability (manifest + service worker).
@@ -77,6 +87,8 @@ Run from within `backend/` or `frontend/` unless noted:
 * `EmailAlreadyRegistered` (409) reveals whether an email is already registered;
   `InvalidCredentials` and `InvalidJoinCode` are deliberately generic to avoid the
   same leak on login/join.
+* No demotion (head → member) and no way to remove a member from a household — only
+  promotion exists, per what was actually asked for.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a

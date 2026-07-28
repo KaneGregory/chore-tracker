@@ -40,7 +40,7 @@ describe('POST /api/auth/register', () => {
     expect(response.status).toBe(201);
     expect(response.body.user.email).toBe('alice@example.com');
     expect(response.body.households).toEqual([
-      { id: expect.any(Number), name: 'The Smiths', joinCode: expect.any(String) },
+      { id: expect.any(Number), name: 'The Smiths', joinCode: expect.any(String), role: 'head' },
     ]);
     expect(response.headers['set-cookie']).toBeDefined();
   });
@@ -88,6 +88,8 @@ describe('POST /api/auth/register', () => {
         household: { mode: 'create', name: 'Dave House' },
       });
 
+    expect(created.body.households[0].role).toBe('head');
+
     const lowercased: string = created.body.households[0].joinCode.toLowerCase();
     const lowercaseHyphenatedCode = `${lowercased.slice(0, 4)}-${lowercased.slice(4)}`;
 
@@ -101,6 +103,7 @@ describe('POST /api/auth/register', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.households[0].id).toBe(created.body.households[0].id);
+    expect(response.body.households[0].role).toBe('member');
   });
 
   it('rejects a password shorter than 8 characters with a 400 validation error', async () => {

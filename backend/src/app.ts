@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { authRouter } from './routes/auth.js';
+import { householdsRouter } from './routes/households.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -19,6 +20,7 @@ export function createApp() {
   app.use(express.json({ limit: '10kb' }));
 
   app.use('/api/auth', authRouter);
+  app.use('/api/households', householdsRouter);
 
   app.use(errorHandler);
 

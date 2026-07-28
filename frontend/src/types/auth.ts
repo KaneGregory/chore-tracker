@@ -1,3 +1,5 @@
+export type HouseholdRole = 'member' | 'head';
+
 export interface User {
   id: number;
   email: string;
@@ -7,6 +9,13 @@ export interface Household {
   id: number;
   name: string;
   joinCode: string;
+  role: HouseholdRole;
+}
+
+export interface HouseholdMember {
+  id: number;
+  email: string;
+  role: HouseholdRole;
 }
 
 export type HouseholdChoice = { mode: 'create'; name: string } | { mode: 'join'; joinCode: string };

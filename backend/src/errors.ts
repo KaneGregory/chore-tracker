@@ -41,3 +41,21 @@ export class NotAuthenticatedError extends AppError {
     super(401, 'NotAuthenticated', 'You must be logged in to do that');
   }
 }
+
+export class HouseholdNotFoundError extends AppError {
+  constructor() {
+    super(404, 'HouseholdNotFound', 'That household was not found');
+  }
+}
+
+export class NotHeadOfHouseholdError extends AppError {
+  constructor() {
+    super(403, 'NotHeadOfHousehold', 'Only a Head of Household can do that');
+  }
+}
+
+export class MemberNotFoundError extends AppError {
+  constructor() {
+    super(404, 'MemberNotFound', 'That person is not a member of this household');
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE `household_members` ADD `role` text DEFAULT 'member' NOT NULL;

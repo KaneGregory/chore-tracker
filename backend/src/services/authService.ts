@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { households, householdMembers, sessions, users } from '../db/schema.js';
+import type { HouseholdRole } from '../db/schema.js';
 import type { Transaction } from '../db/client.js';
 import {
   generateJoinCode,
@@ -29,6 +30,7 @@ export interface PublicHousehold {
   id: number;
   name: string;
   joinCode: string;
+  role: HouseholdRole;
 }
 
 export interface AuthResult {
@@ -57,7 +59,7 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
   const now = Date.now();
   const expiresAt = now + SESSION_TTL_MS;
 
-  const { user, household } = db.transaction((tx) => {
+  const { user, household, role } = db.transaction((tx) => {
     const existingUser = tx
       .select({ id: users.id })
       .from(users)
@@ -71,32 +73,32 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
       .returning()
       .get();
 
-    const household =
-      input.household.mode === 'create'
-        ? insertHouseholdWithUniqueJoinCode(tx, input.household.name, now)
-        : (() => {
-            const joinCode = normalizeJoinCode(input.household.joinCode);
-            const found = tx
-              .select()
-              .from(households)
-              .where(eq(households.joinCode, joinCode))
-              .get();
-            if (!found) throw new InvalidJoinCodeError();
-            return found;
-          })();
+    // The person who creates a household is its first Head of Household.
+    let household: typeof households.$inferSelect;
+    let role: HouseholdRole;
+    if (input.household.mode === 'create') {
+      household = insertHouseholdWithUniqueJoinCode(tx, input.household.name, now);
+      role = 'head';
+    } else {
+      const joinCode = normalizeJoinCode(input.household.joinCode);
+      const found = tx.select().from(households).where(eq(households.joinCode, joinCode)).get();
+      if (!found) throw new InvalidJoinCodeError();
+      household = found;
+      role = 'member';
+    }
 
     tx.insert(householdMembers)
-      .values({ userId: user.id, householdId: household.id, createdAt: now })
+      .values({ userId: user.id, householdId: household.id, role, createdAt: now })
       .run();
 
     tx.insert(sessions).values({ token, userId: user.id, createdAt: now, expiresAt }).run();
 
-    return { user, household };
+    return { user, household, role };
   });
 
   return {
     user: { id: user.id, email: user.email },
-    households: [{ id: household.id, name: household.name, joinCode: household.joinCode }],
+    households: [{ id: household.id, name: household.name, joinCode: household.joinCode, role }],
     token,
   };
 }
@@ -113,7 +115,12 @@ export async function login(input: LoginInput): Promise<AuthResult> {
   const expiresAt = now + SESSION_TTL_MS;
 
   const memberHouseholds = db
-    .select({ id: households.id, name: households.name, joinCode: households.joinCode })
+    .select({
+      id: households.id,
+      name: households.name,
+      joinCode: households.joinCode,
+      role: householdMembers.role,
+    })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))
     .where(eq(householdMembers.userId, user.id))
@@ -142,7 +149,12 @@ export function getSessionUser(
   if (!user) return null;
 
   const memberHouseholds = db
-    .select({ id: households.id, name: households.name, joinCode: households.joinCode })
+    .select({
+      id: households.id,
+      name: households.name,
+      joinCode: households.joinCode,
+      role: householdMembers.role,
+    })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))
     .where(eq(householdMembers.userId, user.id))
