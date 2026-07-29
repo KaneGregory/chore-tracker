@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { MembersList } from './MembersList';
 import { ZoneTree } from './ZoneTree';
+import { CreateChoreForm } from './CreateChoreForm';
+import { ChoresList } from './ChoresList';
 import { ErrorBanner } from '../common/ErrorBanner';
 import * as householdApi from '../../api/householdApi';
 import * as zoneApi from '../../api/zoneApi';
+import * as choreApi from '../../api/choreApi';
 import { ApiError } from '../../api/httpClient';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
+import type { Chore, ChoreType } from '../../types/chore';
 
 function formatJoinCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
@@ -26,6 +30,9 @@ export function HouseholdCard({ household }: { household: Household }) {
   const [zoneTree, setZoneTree] = useState<Zone | null>(null);
   const [zoneError, setZoneError] = useState<string | null>(null);
   const [zoneBusy, setZoneBusy] = useState(false);
+  const [chores, setChores] = useState<Chore[] | null>(null);
+  const [choresError, setChoresError] = useState<string | null>(null);
+  const [creatingChore, setCreatingChore] = useState(false);
 
   useEffect(() => {
     if (!copied) return;
@@ -60,6 +67,23 @@ export function HouseholdCard({ household }: { household: Household }) {
       .catch((err: unknown) => {
         if (!cancelled) {
           setZoneError(err instanceof ApiError ? err.message : 'Could not load zones.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [household.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    choreApi
+      .listChores(household.id)
+      .then((result) => {
+        if (!cancelled) setChores(result);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setChoresError(err instanceof ApiError ? err.message : 'Could not load chores.');
         }
       });
     return () => {
@@ -105,7 +129,20 @@ export function HouseholdCard({ household }: { household: Household }) {
     setZoneBusy(true);
     setZoneError(null);
     try {
-      setZoneTree(await zoneApi.removeZone(household.id, zoneId));
+      const updatedTree = await zoneApi.removeZone(household.id, zoneId);
+      setZoneTree(updatedTree);
+
+      // The backend cascades the zone deletion to any chore_zones rows for it (and
+      // its removed descendants), but chores were fetched separately, so drop those
+      // same ids here rather than waiting for a page reload to notice they're gone.
+      const remainingZoneIds = new Set(flattenZones(updatedTree).map((zone) => zone.id));
+      setChores(
+        (prev) =>
+          prev?.map((chore) => ({
+            ...chore,
+            zoneIds: chore.zoneIds.filter((id) => remainingZoneIds.has(id)),
+          })) ?? null,
+      );
     } catch (err) {
       setZoneError(err instanceof ApiError ? err.message : 'Could not remove that zone.');
     } finally {
@@ -122,6 +159,19 @@ export function HouseholdCard({ household }: { household: Household }) {
       setZoneError(err instanceof ApiError ? err.message : 'Could not move that zone.');
     } finally {
       setZoneBusy(false);
+    }
+  }
+
+  async function handleCreateChore(name: string, type: ChoreType, zoneIds: number[]) {
+    setCreatingChore(true);
+    setChoresError(null);
+    try {
+      const created = await choreApi.createChore(household.id, name, type, zoneIds);
+      setChores((prev) => [...(prev ?? []), created]);
+    } catch (err) {
+      setChoresError(err instanceof ApiError ? err.message : 'Could not create that chore.');
+    } finally {
+      setCreatingChore(false);
     }
   }
 
@@ -173,6 +223,24 @@ export function HouseholdCard({ household }: { household: Household }) {
         </ul>
       ) : (
         !zoneError && <p className="members-loading">Loading zones…</p>
+      )}
+
+      <p className="section-label">Chores</p>
+      <ErrorBanner message={choresError} />
+      {isHead && zoneTree && (
+        <CreateChoreForm
+          zoneTree={zoneTree}
+          submitting={creatingChore}
+          onSubmit={(name, type, zoneIds) => void handleCreateChore(name, type, zoneIds)}
+        />
+      )}
+      {chores && zoneTree ? (
+        <ChoresList
+          chores={chores}
+          zoneNameById={new Map(flattenZones(zoneTree).map((zone) => [zone.id, zone.name]))}
+        />
+      ) : (
+        !choresError && <p className="members-loading">Loading chores…</p>
       )}
     </div>
   );

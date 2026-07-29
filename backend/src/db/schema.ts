@@ -47,6 +47,35 @@ export const zones = sqliteTable('zones', {
   createdAt: integer('created_at').notNull(),
 });
 
+export const CHORE_TYPES = ['single-time', 'forever'] as const;
+export type ChoreType = (typeof CHORE_TYPES)[number];
+
+export const chores = sqliteTable('chores', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  householdId: integer('household_id')
+    .notNull()
+    .references(() => households.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  // How single-time vs. forever chores actually behave differently is future work —
+  // for now this just records which one a chore is.
+  type: text('type', { enum: CHORE_TYPES }).notNull(),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const choreZones = sqliteTable(
+  'chore_zones',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    choreId: integer('chore_id')
+      .notNull()
+      .references(() => chores.id, { onDelete: 'cascade' }),
+    zoneId: integer('zone_id')
+      .notNull()
+      .references(() => zones.id, { onDelete: 'cascade' }),
+  },
+  (table) => [unique().on(table.choreId, table.zoneId)],
+);
+
 export const sessions = sqliteTable('sessions', {
   token: text('token').primaryKey(),
   userId: integer('user_id')

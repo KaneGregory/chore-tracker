@@ -48,6 +48,14 @@ To help the members of a household to manage chores.
   `backend/src/services/membershipAuth.ts`, reused by both `householdService.ts` and
   `zoneService.ts` — put any new household-scoped authorization there rather than
   re-deriving it.
+* Chores (`chores` table) record a `name` and a `type` (`'single-time'` or
+  `'forever'`) — that's it for now. How the two types actually behave differently
+  (recurrence, completion, whatever "forever" ends up meaning day-to-day) is
+  deliberately undecided and future work; don't infer or add behavior for either type
+  beyond what's explicitly asked. A chore's zone assignment is a plain many-to-many
+  join table (`chore_zones`) — zero, one, or many zones, no constraint either way.
+  Same view/mutate split as members and zones (any member views, Head of Household
+  creates), authorized via the same `membershipAuth.ts` helpers.
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
   for installability (manifest + service worker).
@@ -112,6 +120,11 @@ Run from within `backend/` or `frontend/` unless noted:
 * Removing a zone cascades to everything nested inside it, with no undo — an inline
   "are you sure" confirmation guards this in the UI, but there's no soft-delete or
   recovery if someone confirms by mistake.
+* Chores can only be created, not edited, removed, or completed/checked off yet —
+  only creation was asked for this round. There's no chore detail view either, just
+  the flat list shown alongside the create form; anything richer (filtering by zone,
+  editing, completion tracking) is future work along with how the two chore types
+  actually differ.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a
