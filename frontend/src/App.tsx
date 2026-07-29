@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { CreateChorePage } from './pages/CreateChorePage';
+import { ZonesPage } from './pages/ZonesPage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/households/:householdId/chores/new" element={<CreateChorePage />} />
+              <Route path="/households/:householdId/zones" element={<ZonesPage />} />
             </Route>
           </Routes>
         </AppShell>
