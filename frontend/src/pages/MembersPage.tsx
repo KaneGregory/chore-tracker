@@ -7,6 +7,10 @@ import * as householdApi from '../api/householdApi';
 import { ApiError } from '../api/httpClient';
 import type { HouseholdMember } from '../types/auth';
 
+function formatJoinCode(code: string): string {
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
 export function MembersPage() {
   const { householdId: householdIdParam } = useParams();
   const householdId = Number(householdIdParam);
@@ -15,6 +19,7 @@ export function MembersPage() {
   const [members, setMembers] = useState<HouseholdMember[] | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [promotingId, setPromotingId] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const household =
     state.status === 'authenticated'
@@ -39,6 +44,22 @@ export function MembersPage() {
     };
   }, [householdId, household]);
 
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+
+  async function handleCopy() {
+    if (!household) return;
+    try {
+      await navigator.clipboard.writeText(formatJoinCode(household.joinCode));
+      setCopied(true);
+    } catch {
+      // Clipboard access can be denied or unavailable; the code is still visible to copy by hand.
+    }
+  }
+
   async function handlePromote(userId: number) {
     setPromotingId(userId);
     setMembersError(null);
@@ -61,6 +82,17 @@ export function MembersPage() {
     <div className="card">
       <h1>Members</h1>
       <p className="card-eyebrow">For {household.name}</p>
+      <div className="stamp-row">
+        <div className="stamp">{formatJoinCode(household.joinCode)}</div>
+        <button
+          type="button"
+          className={`btn btn-pill-outline${copied ? ' copied' : ''}`}
+          onClick={() => void handleCopy()}
+        >
+          {copied ? 'Copied! ✓' : 'Copy'}
+        </button>
+      </div>
+      <p className="stamp-caption">Share this code so someone else can join.</p>
       <ErrorBanner message={membersError} />
       {members ? (
         <MembersList

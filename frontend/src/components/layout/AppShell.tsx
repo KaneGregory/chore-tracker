@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { UserMenu } from './UserMenu';
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, logout } = useAuth();
+  const { state } = useAuth();
 
   return (
     <div className="app-shell">
@@ -16,9 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {state.status === 'authenticated' && (
           <div className="user-chip">
             <span>{state.user.email}</span>
-            <button type="button" className="btn btn-pill-outline" onClick={() => void logout()}>
-              Log out
-            </button>
+            <UserMenu />
           </div>
         )}
       </header>
