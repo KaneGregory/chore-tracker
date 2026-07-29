@@ -3,7 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
+    "dev": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:ai": "concurrently \"npm --prefix backend run dev:ai\" \"npm --prefix frontend run dev:ai\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

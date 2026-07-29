@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:ai": "PORT=4001 DB_FILE=./data/chore-tracker.ai.db CORS_ORIGIN=http://localhost:4173 tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",

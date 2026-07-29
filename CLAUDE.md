@@ -1,6 +1,42 @@
 ## Purpose
 To help the members of a household to manage chores.
 
+## If you are Claude Code: use `dev:ai`, never `dev`, for your own testing
+
+Run `npm run dev:ai` (root, or per-workspace) whenever *you* need a running instance
+of this app — for manual verification, browser automation, curl smoke tests,
+whatever. Never run plain `npm run dev` yourself, and never assume a process on port
+3001 or 5173 is safe to touch.
+
+* `npm run dev` — the human's. Backend on port 3001 against `chore-tracker.db`,
+  frontend on port 5173. May already be running, may have real data in it.
+* `npm run dev:ai` — yours. Backend on port 4001 against a separate
+  `chore-tracker.ai.db`, frontend on port 4173 (pre-wired via `VITE_API_BASE_URL` to
+  talk to the AI backend). Safe to start, use, and tear down freely — it can never
+  collide with or read/write the human's data, because it's a completely different
+  port and a completely different database file.
+
+**This exists because of a real incident**: an earlier session found unfamiliar
+processes on ports 3001/5173, assumed they were leftovers from its own prior testing,
+and killed them with `pkill`. They weren't — they belonged to the user, and killing
+them interrupted their own work. Don't repeat this.
+
+If you need to stop your own `dev:ai` servers, look them up **by port**, not by
+matching the command:
+
+```sh
+lsof -tiTCP:4001 -sTCP:LISTEN | xargs -r kill
+lsof -tiTCP:4173 -sTCP:LISTEN | xargs -r kill
+```
+
+Never use a broad pattern like `pkill -f "tsx watch src/index.ts"` or `pkill -f vite`
+to stop your own servers. `dev` and `dev:ai` run the exact same underlying command —
+they only differ in environment variables (`PORT`, `DB_FILE`, `CORS_ORIGIN`,
+`VITE_API_BASE_URL`), which don't show up in the command line that `pkill -f`
+matches against. A pattern match can't tell the two apart and can just as easily kill
+the human's dev server as your own. If a port you need is already in use by a process
+you don't recognize, stop and ask the user rather than guessing whose it is.
+
 ## Architectural decisions
 * Two components:
 * 1) A backend that records chore info for households.
@@ -93,12 +129,17 @@ Do:
 Do not:
 * Add multiple components to a single file.
 * Comment code except when describing why something had to be done in a non-obvious way.
+* Run `npm run dev` yourself, or stop processes by pattern-matching the command
+  (`pkill -f ...`) — see "If you are Claude Code" above. Use `dev:ai` and stop it by
+  port.
 
 ## Available scripts
 
 Run from within `backend/` or `frontend/` unless noted:
-* `npm run dev` — start that workspace's dev server. From the repo root, `npm run dev`
-  starts both via `concurrently`.
+* `npm run dev` — start that workspace's dev server (human use). From the repo root,
+  `npm run dev` starts both via `concurrently`.
+* `npm run dev:ai` — same, but on isolated ports/data for Claude Code's own use — see
+  the section above. From the repo root, `npm run dev:ai` starts both.
 * `npm run typecheck` — TypeScript, no emit.
 * `npm run lint` / `npm run format` — ESLint / Prettier.
 * `npm test` (backend only) — Vitest.

@@ -34,6 +34,10 @@ the path in `DB_FILE` (default `./data/chore-tracker.db`) the first time it runs
 To run the whole app (backend + frontend) together, use `npm run dev` from the repo
 root instead.
 
+**If Claude Code is running this for its own testing**, it uses `npm run dev:ai`
+instead (port 4001, a separate `chore-tracker.ai.db`) so it never collides with or
+reads/writes over a human's own dev server or data. See `../CLAUDE.md`.
+
 ## Other scripts
 
 | Command | What it does |
@@ -45,6 +49,7 @@ root instead.
 | `npm test` | Run the test suite (Vitest) |
 | `npm run db:generate` | Generate a new migration from `src/db/schema.ts` after changing it |
 | `npm run db:migrate` | Apply migrations without starting the server |
+| `npm run dev:ai` | Same as `dev`, but on port 4001 with its own `chore-tracker.ai.db` — for AI-agent use, not humans |
 
 ## Project layout
 
