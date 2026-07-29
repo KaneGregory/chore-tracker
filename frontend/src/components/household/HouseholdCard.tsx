@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { MembersList } from './MembersList';
 import { ZoneTree } from './ZoneTree';
-import { CreateChoreForm } from './CreateChoreForm';
 import { ChoresList } from './ChoresList';
 import { ErrorBanner } from '../common/ErrorBanner';
 import * as householdApi from '../../api/householdApi';
@@ -11,7 +11,7 @@ import * as choreApi from '../../api/choreApi';
 import { ApiError } from '../../api/httpClient';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
-import type { Chore, ChoreType } from '../../types/chore';
+import type { Chore } from '../../types/chore';
 
 function formatJoinCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
@@ -32,7 +32,6 @@ export function HouseholdCard({ household }: { household: Household }) {
   const [zoneBusy, setZoneBusy] = useState(false);
   const [chores, setChores] = useState<Chore[] | null>(null);
   const [choresError, setChoresError] = useState<string | null>(null);
-  const [creatingChore, setCreatingChore] = useState(false);
 
   useEffect(() => {
     if (!copied) return;
@@ -162,19 +161,6 @@ export function HouseholdCard({ household }: { household: Household }) {
     }
   }
 
-  async function handleCreateChore(name: string, type: ChoreType, zoneIds: number[]) {
-    setCreatingChore(true);
-    setChoresError(null);
-    try {
-      const created = await choreApi.createChore(household.id, name, type, zoneIds);
-      setChores((prev) => [...(prev ?? []), created]);
-    } catch (err) {
-      setChoresError(err instanceof ApiError ? err.message : 'Could not create that chore.');
-    } finally {
-      setCreatingChore(false);
-    }
-  }
-
   if (state.status !== 'authenticated') return null;
   const isHead = household.role === 'head';
 
@@ -227,12 +213,13 @@ export function HouseholdCard({ household }: { household: Household }) {
 
       <p className="section-label">Chores</p>
       <ErrorBanner message={choresError} />
-      {isHead && zoneTree && (
-        <CreateChoreForm
-          zoneTree={zoneTree}
-          submitting={creatingChore}
-          onSubmit={(name, type, zoneIds) => void handleCreateChore(name, type, zoneIds)}
-        />
+      {isHead && (
+        <Link
+          to={`/households/${household.id}/chores/new`}
+          className="btn btn-primary section-action"
+        >
+          + Add chore
+        </Link>
       )}
       {chores && zoneTree ? (
         <ChoresList

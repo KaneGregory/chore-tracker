@@ -5,6 +5,7 @@ import { AppShell } from './components/layout/AppShell';
 import { RegisterPage } from './pages/RegisterPage';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { CreateChorePage } from './pages/CreateChorePage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<HomePage />} />
+              <Route path="/households/:householdId/chores/new" element={<CreateChorePage />} />
             </Route>
           </Routes>
         </AppShell>
