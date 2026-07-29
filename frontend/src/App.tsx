@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { CreateChorePage } from './pages/CreateChorePage';
 import { ZonesPage } from './pages/ZonesPage';
+import { MembersPage } from './pages/MembersPage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/households/:householdId/chores/new" element={<CreateChorePage />} />
               <Route path="/households/:householdId/zones" element={<ZonesPage />} />
+              <Route path="/households/:householdId/members" element={<MembersPage />} />
             </Route>
           </Routes>
         </AppShell>
