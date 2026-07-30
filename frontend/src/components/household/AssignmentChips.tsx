@@ -14,6 +14,9 @@ interface AssignmentChipsProps {
   onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
   unassigningId: number | null;
   onUnassign: (choreId: number, assignmentId: number) => void;
+  // Renders the assignee chips with no add/remove controls — for a collapsed
+  // summary, where the chips are informational only.
+  readOnly?: boolean;
 }
 
 export function AssignmentChips({
@@ -27,6 +30,7 @@ export function AssignmentChips({
   onAssign,
   unassigningId,
   onUnassign,
+  readOnly = false,
 }: AssignmentChipsProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const isAssigning = assigningKey === `${choreId}:${zoneId ?? 'none'}`;
@@ -43,7 +47,7 @@ export function AssignmentChips({
   return (
     <span className="assignment-chips">
       {assignments.map((assignment) => {
-        const canRemove = isHead || assignment.userId === currentUserId;
+        const canRemove = !readOnly && (isHead || assignment.userId === currentUserId);
         const removing = unassigningId === assignment.id;
         return (
           <span className="assignee-chip" key={assignment.id}>
@@ -63,49 +67,50 @@ export function AssignmentChips({
           </span>
         );
       })}
-      {isHead ? (
-        availableMembers.length > 0 &&
-        (pickerOpen ? (
-          <select
-            className="assignment-select"
-            autoFocus
-            disabled={isAssigning}
-            defaultValue=""
-            onChange={handlePick}
-            onBlur={() => setPickerOpen(false)}
-          >
-            <option value="" disabled>
-              {isAssigning ? 'Assigning…' : 'Choose…'}
-            </option>
-            {availableMembers.map((member) => (
-              <option value={member.id} key={member.id}>
-                {member.username}
+      {!readOnly &&
+        (isHead ? (
+          availableMembers.length > 0 &&
+          (pickerOpen ? (
+            <select
+              className="assignment-select"
+              autoFocus
+              disabled={isAssigning}
+              defaultValue=""
+              onChange={handlePick}
+              onBlur={() => setPickerOpen(false)}
+            >
+              <option value="" disabled>
+                {isAssigning ? 'Assigning…' : 'Choose…'}
               </option>
-            ))}
-          </select>
+              {availableMembers.map((member) => (
+                <option value={member.id} key={member.id}>
+                  {member.username}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <button
+              type="button"
+              className="assign-add-btn"
+              onClick={() => setPickerOpen(true)}
+              aria-label="Assign someone"
+            >
+              +
+            </button>
+          ))
         ) : (
-          <button
-            type="button"
-            className="assign-add-btn"
-            onClick={() => setPickerOpen(true)}
-            aria-label="Assign someone"
-          >
-            +
-          </button>
-        ))
-      ) : (
-        !selfAlreadyAssigned && (
-          <button
-            type="button"
-            className="assign-add-btn"
-            disabled={isAssigning}
-            onClick={() => onAssign(choreId, currentUserId, zoneId)}
-            aria-label="Assign to me"
-          >
-            +
-          </button>
-        )
-      )}
+          !selfAlreadyAssigned && (
+            <button
+              type="button"
+              className="assign-add-btn"
+              disabled={isAssigning}
+              onClick={() => onAssign(choreId, currentUserId, zoneId)}
+              aria-label="Assign to me"
+            >
+              +
+            </button>
+          )
+        ))}
     </span>
   );
 }

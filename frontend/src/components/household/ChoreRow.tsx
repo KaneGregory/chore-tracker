@@ -2,6 +2,8 @@ import type { Chore, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
 import { StatusToggle } from './StatusToggle';
+import { ChoreZoneSection } from './ChoreZoneSection';
+import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreRowProps {
   chore: Chore;
@@ -16,12 +18,6 @@ interface ChoreRowProps {
   statusUpdatingKey: string | null;
   onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
 }
-
-const STATUS_LABEL: Record<Chore['status'], string> = {
-  'to-do': 'To Do',
-  complete: 'Complete',
-  overdue: 'Overdue',
-};
 
 export function ChoreRow({
   chore,
@@ -53,7 +49,7 @@ export function ChoreRow({
           </span>
           {hasZones ? (
             <span className={`chore-status-badge chore-status-${chore.status}`}>
-              {STATUS_LABEL[chore.status]}
+              {CHORE_STATUS_LABEL[chore.status]}
             </span>
           ) : (
             <StatusToggle
@@ -79,32 +75,27 @@ export function ChoreRow({
         </div>
       </div>
       {hasZones && (
-        <div className="zone-tags">
+        <ul className="chore-zones">
           {chore.zones.map((zone) => (
-            <span className="zone-tag" key={zone.zoneId}>
-              {zoneNameById.get(zone.zoneId) ?? 'Unknown zone'}
-              <StatusToggle
-                status={zone.status}
-                disabled={statusUpdatingKey === `${chore.id}:${zone.zoneId}`}
-                onToggle={(status) => onSetStatus(chore.id, zone.zoneId, status)}
-              />
-              {isAssignable && (
-                <AssignmentChips
-                  choreId={chore.id}
-                  zoneId={zone.zoneId}
-                  assignments={assignmentsFor(zone.zoneId)}
-                  members={members}
-                  currentUserId={currentUserId}
-                  isHead={isHead}
-                  assigningKey={assigningKey}
-                  onAssign={onAssign}
-                  unassigningId={unassigningId}
-                  onUnassign={onUnassign}
-                />
-              )}
-            </span>
+            <ChoreZoneSection
+              key={zone.zoneId}
+              choreId={chore.id}
+              zone={zone}
+              zoneName={zoneNameById.get(zone.zoneId) ?? 'Unknown zone'}
+              assignments={assignmentsFor(zone.zoneId)}
+              members={members}
+              currentUserId={currentUserId}
+              isHead={isHead}
+              isAssignable={isAssignable}
+              assigningKey={assigningKey}
+              onAssign={onAssign}
+              unassigningId={unassigningId}
+              onUnassign={onUnassign}
+              statusUpdatingKey={statusUpdatingKey}
+              onSetStatus={onSetStatus}
+            />
           ))}
-        </div>
+        </ul>
       )}
     </li>
   );

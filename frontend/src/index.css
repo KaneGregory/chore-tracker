@@ -783,22 +783,87 @@ fieldset.form-field legend,
   opacity: 0.6;
 }
 
-.zone-tags {
+.chore-zones {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.zone-tag {
-  display: inline-flex;
+.chore-zone-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.chore-zone-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.chore-zone-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.chore-zone-summary {
+  display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.75rem;
+}
+
+.chore-zone-caret {
   color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 2px 8px;
+  font-size: 0.75rem;
+  flex: none;
+}
+
+.chore-zone-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 10px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.chore-zone-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.status-dot-to-do {
+  background: none;
+  border: 2px solid var(--muted);
+}
+
+.status-dot-complete {
+  background: var(--accent-2);
+}
+
+.status-dot-overdue {
+  background: var(--error);
 }
 
 .assignment-chips {
