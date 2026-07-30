@@ -22,3 +22,16 @@ export async function createChore(
   });
   return response.chore;
 }
+
+export async function assignChore(
+  householdId: number,
+  choreId: number,
+  userId: number,
+  zoneId: number | null,
+): Promise<Chore> {
+  const response = await apiRequest<{ chore: Chore }>(
+    `/api/households/${householdId}/chores/${choreId}/assignments`,
+    { method: 'POST', body: JSON.stringify({ userId, zoneId }) },
+  );
+  return response.chore;
+}

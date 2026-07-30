@@ -77,3 +77,33 @@ export class InvalidZoneMoveError extends AppError {
     super(400, 'InvalidZoneMove', 'A zone can’t be moved into itself or one of its own zones');
   }
 }
+
+export class ChoreNotFoundError extends AppError {
+  constructor() {
+    super(404, 'ChoreNotFound', 'That chore was not found');
+  }
+}
+
+export class ChoreNotAssignableError extends AppError {
+  constructor() {
+    super(400, 'ChoreNotAssignable', 'Only single-time chores can be assigned right now');
+  }
+}
+
+export class ChoreZoneMismatchError extends AppError {
+  constructor() {
+    super(400, 'ChoreZoneMismatch', 'That zone is not one of this chore’s zones');
+  }
+}
+
+export class CannotAssignOthersError extends AppError {
+  constructor() {
+    super(403, 'CannotAssignOthers', 'Only a Head of Household can assign a chore to someone else');
+  }
+}
+
+export class ChoreAlreadyAssignedError extends AppError {
+  constructor() {
+    super(409, 'ChoreAlreadyAssigned', 'That person is already assigned to this chore');
+  }
+}

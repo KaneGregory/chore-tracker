@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { NotAuthenticatedError, ValidationError } from '../errors.js';
 import { householdParamsSchema } from '../validation/householdSchemas.js';
-import { createChoreSchema } from '../validation/choreSchemas.js';
+import { assignChoreSchema, choreParamsSchema, createChoreSchema } from '../validation/choreSchemas.js';
 import * as choreService from '../services/choreService.js';
 
 export const choresRouter = Router();
@@ -48,6 +48,35 @@ choresRouter.post('/:householdId/chores', (req, res, next) => {
       bodyParsed.data.name,
       bodyParsed.data.type,
       bodyParsed.data.zoneIds,
+    );
+    res.status(201).json({ chore });
+  } catch (err) {
+    next(err);
+  }
+});
+
+choresRouter.post('/:householdId/chores/:choreId/assignments', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = choreParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid household or chore id', paramsParsed.error.issues));
+    return;
+  }
+
+  const bodyParsed = assignChoreSchema.safeParse(req.body);
+  if (!bodyParsed.success) {
+    next(new ValidationError('Invalid assignment details', bodyParsed.error.issues));
+    return;
+  }
+
+  try {
+    const chore = choreService.assignChore(
+      paramsParsed.data.householdId,
+      paramsParsed.data.choreId,
+      req.user.id,
+      bodyParsed.data.userId,
+      bodyParsed.data.zoneId,
     );
     res.status(201).json({ chore });
   } catch (err) {

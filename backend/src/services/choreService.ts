@@ -1,35 +1,82 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { chores, choreZones, zones } from '../db/schema.js';
+import { choreAssignments, chores, choreZones, users, zones } from '../db/schema.js';
 import type { ChoreType } from '../db/schema.js';
-import { ZoneNotFoundError } from '../errors.js';
-import { requireHeadMembership, requireMembership } from './membershipAuth.js';
+import {
+  CannotAssignOthersError,
+  ChoreAlreadyAssignedError,
+  ChoreNotAssignableError,
+  ChoreNotFoundError,
+  ChoreZoneMismatchError,
+  MemberNotFoundError,
+  ZoneNotFoundError,
+} from '../errors.js';
+import { getMembership, requireHeadMembership, requireMembership } from './membershipAuth.js';
+
+export interface ChoreAssignmentSummary {
+  id: number;
+  userId: number;
+  userEmail: string;
+  zoneId: number | null;
+}
 
 export interface ChoreSummary {
   id: number;
   name: string;
   type: ChoreType;
   zoneIds: number[];
+  assignments: ChoreAssignmentSummary[];
 }
 
-function attachZoneIds(choreRows: { id: number; name: string; type: ChoreType }[]): ChoreSummary[] {
+function attachDetails(choreRows: { id: number; name: string; type: ChoreType }[]): ChoreSummary[] {
   if (choreRows.length === 0) return [];
 
   const choreIds = choreRows.map((row) => row.id);
-  const links = db
+
+  const zoneLinks = db
     .select({ choreId: choreZones.choreId, zoneId: choreZones.zoneId })
     .from(choreZones)
     .where(inArray(choreZones.choreId, choreIds))
     .all();
 
   const zoneIdsByChore = new Map<number, number[]>();
-  for (const link of links) {
+  for (const link of zoneLinks) {
     const ids = zoneIdsByChore.get(link.choreId) ?? [];
     ids.push(link.zoneId);
     zoneIdsByChore.set(link.choreId, ids);
   }
 
-  return choreRows.map((row) => ({ ...row, zoneIds: zoneIdsByChore.get(row.id) ?? [] }));
+  const assignmentRows = db
+    .select({
+      id: choreAssignments.id,
+      choreId: choreAssignments.choreId,
+      zoneId: choreAssignments.zoneId,
+      userId: choreAssignments.userId,
+      userEmail: users.email,
+    })
+    .from(choreAssignments)
+    .innerJoin(users, eq(users.id, choreAssignments.userId))
+    .where(inArray(choreAssignments.choreId, choreIds))
+    .all();
+
+  const assignmentsByChore = new Map<number, ChoreAssignmentSummary[]>();
+  for (const row of assignmentRows) {
+    const list = assignmentsByChore.get(row.choreId) ?? [];
+    list.push({ id: row.id, userId: row.userId, userEmail: row.userEmail, zoneId: row.zoneId });
+    assignmentsByChore.set(row.choreId, list);
+  }
+
+  return choreRows.map((row) => ({
+    ...row,
+    zoneIds: zoneIdsByChore.get(row.id) ?? [],
+    assignments: assignmentsByChore.get(row.id) ?? [],
+  }));
+}
+
+// attachDetails is written for the list case; this re-attaches details to a single
+// already-fetched chore row, which always yields exactly one result.
+function attachDetailsToOne(choreRow: { id: number; name: string; type: ChoreType }): ChoreSummary {
+  return attachDetails([choreRow])[0]!;
 }
 
 export function listChoresForRequester(
@@ -44,7 +91,7 @@ export function listChoresForRequester(
     .where(eq(chores.householdId, householdId))
     .all();
 
-  return attachZoneIds(rows);
+  return attachDetails(rows);
 }
 
 export function createChore(
@@ -83,5 +130,72 @@ export function createChore(
     return inserted;
   });
 
-  return { id: chore.id, name: chore.name, type: chore.type, zoneIds: uniqueZoneIds };
+  return attachDetailsToOne({ id: chore.id, name: chore.name, type: chore.type });
+}
+
+export function assignChore(
+  householdId: number,
+  choreId: number,
+  requestingUserId: number,
+  assigneeUserId: number,
+  zoneId: number | null,
+): ChoreSummary {
+  const requesterRole = requireMembership(householdId, requestingUserId);
+  if (requesterRole !== 'head' && assigneeUserId !== requestingUserId) {
+    throw new CannotAssignOthersError();
+  }
+
+  const chore = db
+    .select({ id: chores.id, name: chores.name, type: chores.type })
+    .from(chores)
+    .where(and(eq(chores.id, choreId), eq(chores.householdId, householdId)))
+    .get();
+  if (!chore) throw new ChoreNotFoundError();
+  if (chore.type !== 'single-time') throw new ChoreNotAssignableError();
+
+  if (assigneeUserId !== requestingUserId && !getMembership(householdId, assigneeUserId)) {
+    throw new MemberNotFoundError();
+  }
+
+  if (zoneId !== null) {
+    const link = db
+      .select({ zoneId: choreZones.zoneId })
+      .from(choreZones)
+      .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
+      .get();
+    if (!link) throw new ChoreZoneMismatchError();
+  }
+
+  // Assignment is many-to-many: several people can share a chore/zone target, but
+  // not the same person twice. "Same person, same target" is checked here rather
+  // than with a DB unique constraint because SQLite treats every NULL as distinct in
+  // a unique index, so unique(choreId, zoneId, userId) wouldn't stop the same person
+  // being assigned twice to a whole-chore (zoneId IS NULL) target. better-sqlite3 is
+  // synchronous and single-connection, so there's no interleaving between this check
+  // and the insert below to race against.
+  const now = Date.now();
+  db.transaction((tx) => {
+    const existing = tx
+      .select({ id: choreAssignments.id })
+      .from(choreAssignments)
+      .where(
+        zoneId === null
+          ? and(
+              eq(choreAssignments.choreId, choreId),
+              isNull(choreAssignments.zoneId),
+              eq(choreAssignments.userId, assigneeUserId),
+            )
+          : and(
+              eq(choreAssignments.choreId, choreId),
+              eq(choreAssignments.zoneId, zoneId),
+              eq(choreAssignments.userId, assigneeUserId),
+            ),
+      )
+      .get();
+    if (existing) throw new ChoreAlreadyAssignedError();
+
+    tx.insert(choreAssignments).values({ choreId, zoneId, userId: assigneeUserId, createdAt: now }).run();
+  });
+
+  return attachDetailsToOne(chore);
 }

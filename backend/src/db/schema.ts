@@ -76,6 +76,19 @@ export const choreZones = sqliteTable(
   (table) => [unique().on(table.choreId, table.zoneId)],
 );
 
+export const choreAssignments = sqliteTable('chore_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  choreId: integer('chore_id')
+    .notNull()
+    .references(() => chores.id, { onDelete: 'cascade' }),
+  // NULL means the chore itself, not scoped to one of its zones.
+  zoneId: integer('zone_id').references(() => zones.id, { onDelete: 'cascade' }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at').notNull(),
+});
+
 export const sessions = sqliteTable('sessions', {
   token: text('token').primaryKey(),
   userId: integer('user_id')

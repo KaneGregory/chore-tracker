@@ -11,3 +11,18 @@ export const createChoreSchema = z.object({
 });
 
 export type CreateChoreInput = z.infer<typeof createChoreSchema>;
+
+export const choreParamsSchema = z.object({
+  householdId: idParam,
+  choreId: idParam,
+});
+
+export const assignChoreSchema = z.object({
+  userId: idParam,
+  zoneId: idParam
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+});
+
+export type AssignChoreInput = z.infer<typeof assignChoreSchema>;

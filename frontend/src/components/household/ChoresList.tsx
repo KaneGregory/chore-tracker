@@ -1,11 +1,26 @@
 import type { Chore } from '../../types/chore';
+import type { HouseholdMember } from '../../types/auth';
+import { ChoreRow } from './ChoreRow';
 
 interface ChoresListProps {
   chores: Chore[];
   zoneNameById: Map<number, string>;
+  members: HouseholdMember[];
+  currentUserId: number;
+  isHead: boolean;
+  assigningKey: string | null;
+  onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
 }
 
-export function ChoresList({ chores, zoneNameById }: ChoresListProps) {
+export function ChoresList({
+  chores,
+  zoneNameById,
+  members,
+  currentUserId,
+  isHead,
+  assigningKey,
+  onAssign,
+}: ChoresListProps) {
   if (chores.length === 0) {
     return <p className="chores-empty">No chores yet.</p>;
   }
@@ -13,23 +28,16 @@ export function ChoresList({ chores, zoneNameById }: ChoresListProps) {
   return (
     <ul className="chores-list">
       {chores.map((chore) => (
-        <li className="chore-row" key={chore.id}>
-          <div className="chore-row-main">
-            <span className="chore-name">{chore.name}</span>
-            <span className={`chore-type-badge chore-type-${chore.type}`}>
-              {chore.type === 'forever' ? 'Forever' : 'Single-time'}
-            </span>
-          </div>
-          {chore.zoneIds.length > 0 && (
-            <div className="zone-tags">
-              {chore.zoneIds.map((zoneId) => (
-                <span className="zone-tag" key={zoneId}>
-                  {zoneNameById.get(zoneId) ?? 'Unknown zone'}
-                </span>
-              ))}
-            </div>
-          )}
-        </li>
+        <ChoreRow
+          key={chore.id}
+          chore={chore}
+          zoneNameById={zoneNameById}
+          members={members}
+          currentUserId={currentUserId}
+          isHead={isHead}
+          assigningKey={assigningKey}
+          onAssign={onAssign}
+        />
       ))}
     </ul>
   );
