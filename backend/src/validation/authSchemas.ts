@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const emailSchema = z.string().trim().toLowerCase().email();
+export const usernameSchema = z.string().trim().min(1).max(30);
 const passwordSchema = z.string().min(8).max(256);
 
 const createHouseholdSchema = z.object({
@@ -19,6 +20,7 @@ const joinHouseholdSchema = z.object({
 
 export const registerSchema = z.object({
   email: emailSchema,
+  username: usernameSchema,
   password: passwordSchema,
   household: z.discriminatedUnion('mode', [createHouseholdSchema, joinHouseholdSchema]),
 });
@@ -30,6 +32,10 @@ export const loginSchema = z.object({
 
 export const emailAvailabilityQuerySchema = z.object({
   email: emailSchema,
+});
+
+export const usernameAvailabilityQuerySchema = z.object({
+  username: usernameSchema,
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

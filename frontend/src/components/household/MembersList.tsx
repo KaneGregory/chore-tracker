@@ -20,7 +20,7 @@ export function MembersList({
       {members.map((member) => (
         <li className="member-row" key={member.id}>
           <span>
-            {member.email}
+            {member.username}
             {member.id === currentUserId && <span className="member-you"> (you)</span>}
           </span>
           {member.role === 'head' ? (

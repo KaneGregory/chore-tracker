@@ -4,6 +4,7 @@ import {
   emailAvailabilityQuerySchema,
   loginSchema,
   registerSchema,
+  usernameAvailabilityQuerySchema,
 } from '../validation/authSchemas.js';
 import * as authService from '../services/authService.js';
 import { requireAuth } from '../middleware/requireAuth.js';
@@ -19,6 +20,17 @@ authRouter.get('/email-availability', (req, res, next) => {
   }
 
   const available = authService.isEmailAvailable(parsed.data.email);
+  res.status(200).json({ available });
+});
+
+authRouter.get('/username-availability', (req, res, next) => {
+  const parsed = usernameAvailabilityQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    next(new ValidationError('Invalid username', parsed.error.issues));
+    return;
+  }
+
+  const available = authService.isUsernameAvailable(parsed.data.username);
   res.status(200).json({ available });
 });
 

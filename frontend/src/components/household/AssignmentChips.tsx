@@ -40,7 +40,7 @@ export function AssignmentChips({
     <span className="assignment-chips">
       {assignments.map((assignment) => (
         <span className="assignee-chip" key={assignment.id}>
-          {assignment.userEmail}
+          {assignment.username}
           {assignment.userId === currentUserId ? ' (you)' : ''}
         </span>
       ))}
@@ -60,7 +60,7 @@ export function AssignmentChips({
             </option>
             {availableMembers.map((member) => (
               <option value={member.id} key={member.id}>
-                {member.email}
+                {member.username}
               </option>
             ))}
           </select>

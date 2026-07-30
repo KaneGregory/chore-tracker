@@ -50,6 +50,15 @@ describe('migrations', () => {
     expect(emailIndex?.unique).toBe(1);
   });
 
+  it('enforces a unique index on users.username', () => {
+    const indexes = sqlite.prepare('PRAGMA index_list(users)').all() as Array<{
+      name: string;
+      unique: number;
+    }>;
+    const usernameIndex = indexes.find((i) => i.name.includes('username'));
+    expect(usernameIndex?.unique).toBe(1);
+  });
+
   it('enforces a composite unique index on household_members(user_id, household_id)', () => {
     const indexes = sqlite.prepare('PRAGMA index_list(household_members)').all() as Array<{
       name: string;

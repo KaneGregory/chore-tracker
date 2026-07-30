@@ -42,6 +42,7 @@ describe('GET /api/auth/email-availability', () => {
       .post('/api/auth/register')
       .send({
         email: 'henry@example.com',
+        username: 'henry',
         password: 'correct-horse-battery',
         household: { mode: 'create', name: 'Henry House' },
       });
@@ -69,18 +70,52 @@ describe('GET /api/auth/email-availability', () => {
   });
 });
 
+describe('GET /api/auth/username-availability', () => {
+  it('reports an unused username as available', async () => {
+    const response = await request(app).get('/api/auth/username-availability?username=unused');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ available: true });
+  });
+
+  it('reports a registered username as unavailable', async () => {
+    await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'ida@example.com',
+        username: 'ida',
+        password: 'correct-horse-battery',
+        household: { mode: 'create', name: 'Ida House' },
+      });
+
+    const response = await request(app).get('/api/auth/username-availability?username=ida');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ available: false });
+  });
+
+  it('rejects a missing username with 400', async () => {
+    const response = await request(app).get('/api/auth/username-availability');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+});
+
 describe('POST /api/auth/register', () => {
   it('registers a new user and creates a household', async () => {
     const response = await request(app)
       .post('/api/auth/register')
       .send({
         email: 'Alice@Example.com',
+        username: 'alice',
         password: 'correct-horse-battery',
         household: { mode: 'create', name: 'The Smiths' },
       });
 
     expect(response.status).toBe(201);
     expect(response.body.user.email).toBe('alice@example.com');
+    expect(response.body.user.username).toBe('alice');
     expect(response.body.households).toEqual([
       { id: expect.any(Number), name: 'The Smiths', joinCode: expect.any(String), role: 'head' },
     ]);
@@ -92,6 +127,7 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({
         email: 'bob@example.com',
+        username: 'bob',
         password: 'correct-horse-battery',
         household: { mode: 'create', name: 'Bob House' },
       });
@@ -100,6 +136,7 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({
         email: 'bob@example.com',
+        username: 'bob-two',
         password: 'another-password',
         household: { mode: 'create', name: 'Other House' },
       });
@@ -108,11 +145,35 @@ describe('POST /api/auth/register', () => {
     expect(response.body.error).toBe('EmailAlreadyRegistered');
   });
 
+  it('rejects a duplicate username with 409', async () => {
+    await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'una@example.com',
+        username: 'taken-name',
+        password: 'correct-horse-battery',
+        household: { mode: 'create', name: 'Una House' },
+      });
+
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'uma@example.com',
+        username: 'taken-name',
+        password: 'correct-horse-battery',
+        household: { mode: 'create', name: 'Uma House' },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe('UsernameAlreadyTaken');
+  });
+
   it('rejects an invalid join code with 400 without leaking which part was wrong', async () => {
     const response = await request(app)
       .post('/api/auth/register')
       .send({
         email: 'carol@example.com',
+        username: 'carol',
         password: 'correct-horse-battery',
         household: { mode: 'join', joinCode: 'ZZZZ-ZZZZ' },
       });
@@ -126,6 +187,7 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({
         email: 'dave@example.com',
+        username: 'dave',
         password: 'correct-horse-battery',
         household: { mode: 'create', name: 'Dave House' },
       });
@@ -139,6 +201,7 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({
         email: 'erin@example.com',
+        username: 'erin',
         password: 'correct-horse-battery',
         household: { mode: 'join', joinCode: lowercaseHyphenatedCode },
       });
@@ -153,8 +216,22 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({
         email: 'frank@example.com',
+        username: 'frank',
         password: 'short',
         household: { mode: 'create', name: 'X' },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('rejects a missing username with a 400 validation error', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'gus@example.com',
+        password: 'correct-horse-battery',
+        household: { mode: 'create', name: 'Gus House' },
       });
 
     expect(response.status).toBe(400);
@@ -168,6 +245,7 @@ describe('POST /api/auth/login, GET /api/auth/me, POST /api/auth/logout', () => 
       .post('/api/auth/register')
       .send({
         email: 'grace@example.com',
+        username: 'grace',
         password: 'correct-horse-battery',
         household: { mode: 'create', name: 'Grace House' },
       });
@@ -181,6 +259,7 @@ describe('POST /api/auth/login, GET /api/auth/me, POST /api/auth/logout', () => 
     const meResponse = await request(app).get('/api/auth/me').set('Cookie', cookie);
     expect(meResponse.status).toBe(200);
     expect(meResponse.body.user.email).toBe('grace@example.com');
+    expect(meResponse.body.user.username).toBe('grace');
 
     const logoutResponse = await request(app).post('/api/auth/logout').set('Cookie', cookie);
     expect(logoutResponse.status).toBe(204);

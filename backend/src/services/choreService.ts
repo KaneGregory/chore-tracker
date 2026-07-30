@@ -16,7 +16,7 @@ import { getMembership, requireHeadMembership, requireMembership } from './membe
 export interface ChoreAssignmentSummary {
   id: number;
   userId: number;
-  userEmail: string;
+  username: string;
   zoneId: number | null;
 }
 
@@ -52,7 +52,7 @@ function attachDetails(choreRows: { id: number; name: string; type: ChoreType }[
       choreId: choreAssignments.choreId,
       zoneId: choreAssignments.zoneId,
       userId: choreAssignments.userId,
-      userEmail: users.email,
+      username: users.username,
     })
     .from(choreAssignments)
     .innerJoin(users, eq(users.id, choreAssignments.userId))
@@ -62,7 +62,7 @@ function attachDetails(choreRows: { id: number; name: string; type: ChoreType }[
   const assignmentsByChore = new Map<number, ChoreAssignmentSummary[]>();
   for (const row of assignmentRows) {
     const list = assignmentsByChore.get(row.choreId) ?? [];
-    list.push({ id: row.id, userId: row.userId, userEmail: row.userEmail, zoneId: row.zoneId });
+    list.push({ id: row.id, userId: row.userId, username: row.username, zoneId: row.zoneId });
     assignmentsByChore.set(row.choreId, list);
   }
 

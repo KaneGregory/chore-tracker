@@ -9,6 +9,7 @@ import type { HouseholdChoice } from '../types/auth';
 
 export function RegisterPage() {
   const [step, setStep] = useState<'credentials' | 'household'>('credentials');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -16,7 +17,8 @@ export function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  function handleCredentialsNext(nextEmail: string, nextPassword: string) {
+  function handleCredentialsNext(nextUsername: string, nextEmail: string, nextPassword: string) {
+    setUsername(nextUsername);
     setEmail(nextEmail);
     setPassword(nextPassword);
     setStep('household');
@@ -26,7 +28,7 @@ export function RegisterPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await register({ email, password, household });
+      await register({ username, email, password, household });
       navigate('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
@@ -42,6 +44,7 @@ export function RegisterPage() {
           <p className="card-eyebrow">You&rsquo;ll pick a household next.</p>
           <ErrorBanner message={error} />
           <RegistrationForm
+            initialUsername={username}
             initialEmail={email}
             initialPassword={password}
             onNext={handleCredentialsNext}

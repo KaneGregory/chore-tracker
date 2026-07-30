@@ -24,6 +24,12 @@ export class EmailAlreadyRegisteredError extends AppError {
   }
 }
 
+export class UsernameAlreadyTakenError extends AppError {
+  constructor() {
+    super(409, 'UsernameAlreadyTaken', 'That username is already taken');
+  }
+}
+
 export class InvalidJoinCodeError extends AppError {
   constructor() {
     super(400, 'InvalidJoinCode', 'That household join code is not valid');

@@ -6,13 +6,13 @@ import { getMembership, requireHeadMembership, requireMembership } from './membe
 
 export interface HouseholdMember {
   id: number;
-  email: string;
+  username: string;
   role: 'member' | 'head';
 }
 
 function listMembers(householdId: number): HouseholdMember[] {
   return db
-    .select({ id: users.id, email: users.email, role: householdMembers.role })
+    .select({ id: users.id, username: users.username, role: householdMembers.role })
     .from(householdMembers)
     .innerJoin(users, eq(householdMembers.userId, users.id))
     .where(eq(householdMembers.householdId, householdId))

@@ -52,6 +52,17 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
 * Auth: email + password, hashed with `argon2` (library defaults). Sessions are
   server-side rows (`sessions` table) referenced by an opaque random token stored in
   an httpOnly cookie — not JWT — so a session can be revoked by deleting its row.
+* Every user also has a `username` (`users.username`, globally unique, case-sensitive,
+  free text — not validated as a slug), chosen at registration before the household
+  step and checked for availability the same way email is (`GET
+  /api/auth/username-availability`, mirroring `/email-availability`). It's the
+  display identity everywhere in the app except the header, which still shows email
+  (`AppShell`) — that split is intentional, not an oversight, so don't "fix" it by
+  making the header consistent with everywhere else. There's no rename UI yet.
+  Migration `0005` was hand-edited from drizzle-kit's generated output to backfill
+  pre-existing rows with a `'user-<id>'` placeholder username, since SQLite can't add
+  a `NOT NULL` column with no default to a non-empty table — see the comment at the
+  top of that migration file before regenerating anything in this area.
 * A user's household membership is a many-to-many join table (`household_members`),
   not a single FK on `users`, so a user can belong to multiple households without a
   future migration.
@@ -154,7 +165,11 @@ Run from within `backend/` or `frontend/` unless noted:
 * No rate limiting on `/api/auth/register` or `/api/auth/login`.
 * `EmailAlreadyRegistered` (409) reveals whether an email is already registered;
   `InvalidCredentials` and `InvalidJoinCode` are deliberately generic to avoid the
-  same leak on login/join.
+  same leak on login/join. `UsernameAlreadyTaken` (409) and `/username-availability`
+  have the same existence-leak tradeoff, deliberately, for the same reason.
+* No way to change a username after registration, and pre-existing accounts from
+  before the username migration got an auto-generated `user-<id>` placeholder instead
+  of a real one — there's no UI to fix that up.
 * No demotion (head → member) and no way to remove a member from a household — only
   promotion exists, per what was actually asked for.
 * Zones can't be renamed after creation — only create/remove/move were asked for.

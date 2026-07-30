@@ -3,7 +3,7 @@ export type ChoreType = 'single-time' | 'forever';
 export interface ChoreAssignment {
   id: number;
   userId: number;
-  userEmail: string;
+  username: string;
   zoneId: number | null;
 }
 

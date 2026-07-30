@@ -32,6 +32,7 @@ async function registerHeadOfHousehold(email: string, householdName: string) {
     .post('/api/auth/register')
     .send({
       email,
+      username: email.split('@')[0],
       password: 'correct-horse-battery',
       household: { mode: 'create', name: householdName },
     });
@@ -46,7 +47,12 @@ async function registerHeadOfHousehold(email: string, householdName: string) {
 async function registerAndJoin(email: string, joinCode: string) {
   const response = await request(app)
     .post('/api/auth/register')
-    .send({ email, password: 'correct-horse-battery', household: { mode: 'join', joinCode } });
+    .send({
+      email,
+      username: email.split('@')[0],
+      password: 'correct-horse-battery',
+      household: { mode: 'join', joinCode },
+    });
   return { cookie: cookieFrom(response) };
 }
 

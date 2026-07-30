@@ -29,3 +29,10 @@ export async function isEmailAvailable(email: string): Promise<boolean> {
   );
   return response.available;
 }
+
+export async function isUsernameAvailable(username: string): Promise<boolean> {
+  const response = await apiRequest<{ available: boolean }>(
+    `/api/auth/username-availability?username=${encodeURIComponent(username)}`,
+  );
+  return response.available;
+}

@@ -14,6 +14,7 @@ import {
   EmailAlreadyRegisteredError,
   InvalidCredentialsError,
   InvalidJoinCodeError,
+  UsernameAlreadyTakenError,
 } from '../errors.js';
 import type { RegisterInput, LoginInput } from '../validation/authSchemas.js';
 
@@ -24,6 +25,7 @@ const JOIN_CODE_GENERATION_ATTEMPTS = 10;
 export interface PublicUser {
   id: number;
   email: string;
+  username: string;
 }
 
 export interface PublicHousehold {
@@ -58,6 +60,15 @@ export function isEmailAvailable(email: string): boolean {
   return !existing;
 }
 
+export function isUsernameAvailable(username: string): boolean {
+  const existing = db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, username))
+    .get();
+  return !existing;
+}
+
 export async function register(input: RegisterInput): Promise<AuthResult> {
   const passwordHash = await hashPassword(input.password);
   const token = generateSessionToken();
@@ -72,9 +83,16 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
       .get();
     if (existingUser) throw new EmailAlreadyRegisteredError();
 
+    const existingUsername = tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, input.username))
+      .get();
+    if (existingUsername) throw new UsernameAlreadyTakenError();
+
     const user = tx
       .insert(users)
-      .values({ email: input.email, passwordHash, createdAt: now })
+      .values({ email: input.email, username: input.username, passwordHash, createdAt: now })
       .returning()
       .get();
 
@@ -112,7 +130,7 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
   });
 
   return {
-    user: { id: user.id, email: user.email },
+    user: { id: user.id, email: user.email, username: user.username },
     households: [{ id: household.id, name: household.name, joinCode: household.joinCode, role }],
     token,
   };
@@ -144,7 +162,7 @@ export async function login(input: LoginInput): Promise<AuthResult> {
   db.insert(sessions).values({ token, userId: user.id, createdAt: now, expiresAt }).run();
 
   return {
-    user: { id: user.id, email: user.email },
+    user: { id: user.id, email: user.email, username: user.username },
     households: memberHouseholds,
     token,
   };
@@ -175,5 +193,8 @@ export function getSessionUser(
     .where(eq(householdMembers.userId, user.id))
     .all();
 
-  return { user: { id: user.id, email: user.email }, households: memberHouseholds };
+  return {
+    user: { id: user.id, email: user.email, username: user.username },
+    households: memberHouseholds,
+  };
 }
