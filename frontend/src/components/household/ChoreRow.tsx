@@ -28,7 +28,7 @@ export function ChoreRow({
   }
 
   return (
-    <li className="chore-row">
+    <li className="chore-card">
       <div className="chore-row-main">
         <span className="chore-name">{chore.name}</span>
         <div className="chore-row-actions">

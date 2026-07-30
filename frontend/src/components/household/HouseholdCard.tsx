@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { ChoresList } from './ChoresList';
 import { ErrorBanner } from '../common/ErrorBanner';
@@ -90,17 +89,8 @@ export function HouseholdCard({ household }: { household: Household }) {
   const isHead = household.role === 'head';
 
   return (
-    <div className="household-card">
-      <h2>{household.name}</h2>
+    <>
       <ErrorBanner message={zoneError ?? choresError ?? assignError} />
-      {isHead && (
-        <Link
-          to={`/households/${household.id}/chores/new`}
-          className="btn btn-primary section-action"
-        >
-          + Add chore
-        </Link>
-      )}
       {chores && zoneTree ? (
         <ChoresList
           chores={chores}
@@ -114,6 +104,6 @@ export function HouseholdCard({ household }: { household: Household }) {
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>
       )}
-    </div>
+    </>
   );
 }

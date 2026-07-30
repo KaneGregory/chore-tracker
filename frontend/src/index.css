@@ -423,18 +423,46 @@ a {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
+/* ---------- page header ---------- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 20px;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.btn-fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.btn-fab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
 /* ---------- household / stamp ---------- */
-
-.household-card {
-  border: 2px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 18px;
-  margin-bottom: 14px;
-}
-
-.household-card h2 {
-  font-size: 1.1rem;
-}
 
 .stamp-row {
   display: flex;
@@ -513,10 +541,6 @@ a {
   letter-spacing: 0.06em;
   color: var(--muted);
   margin: 18px 0 4px;
-}
-
-.section-action {
-  margin-bottom: 12px;
 }
 
 /* ---------- zone tree ---------- */
@@ -640,13 +664,35 @@ fieldset.form-field legend,
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 26px;
 }
 
-.chore-row {
-  border: 2px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+.chore-card {
+  position: relative;
+  background: var(--card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 18px 14px 14px;
+  transform: rotate(-0.8deg);
+}
+
+.chore-card:nth-child(even) {
+  transform: rotate(0.7deg);
+}
+
+.chore-card::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 56px;
+  height: 18px;
+  margin-left: -28px;
+  background: var(--tape);
+  opacity: 0.85;
+  border-radius: 3px;
+  transform: rotate(-3deg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .chore-row-main {
