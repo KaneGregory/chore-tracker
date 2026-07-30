@@ -12,6 +12,8 @@ interface AssignmentChipsProps {
   isHead: boolean;
   assigningKey: string | null;
   onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
+  unassigningId: number | null;
+  onUnassign: (choreId: number, assignmentId: number) => void;
 }
 
 export function AssignmentChips({
@@ -23,6 +25,8 @@ export function AssignmentChips({
   isHead,
   assigningKey,
   onAssign,
+  unassigningId,
+  onUnassign,
 }: AssignmentChipsProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const isAssigning = assigningKey === `${choreId}:${zoneId ?? 'none'}`;
@@ -38,12 +42,27 @@ export function AssignmentChips({
 
   return (
     <span className="assignment-chips">
-      {assignments.map((assignment) => (
-        <span className="assignee-chip" key={assignment.id}>
-          {assignment.username}
-          {assignment.userId === currentUserId ? ' (you)' : ''}
-        </span>
-      ))}
+      {assignments.map((assignment) => {
+        const canRemove = isHead || assignment.userId === currentUserId;
+        const removing = unassigningId === assignment.id;
+        return (
+          <span className="assignee-chip" key={assignment.id}>
+            {assignment.username}
+            {assignment.userId === currentUserId ? ' (you)' : ''}
+            {canRemove && (
+              <button
+                type="button"
+                className="chip-remove"
+                disabled={removing}
+                onClick={() => onUnassign(choreId, assignment.id)}
+                aria-label={`Unassign ${assignment.username}`}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        );
+      })}
       {isHead ? (
         availableMembers.length > 0 &&
         (pickerOpen ? (

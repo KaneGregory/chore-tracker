@@ -26,3 +26,9 @@ export const assignChoreSchema = z.object({
 });
 
 export type AssignChoreInput = z.infer<typeof assignChoreSchema>;
+
+export const assignmentParamsSchema = z.object({
+  householdId: idParam,
+  choreId: idParam,
+  assignmentId: idParam,
+});

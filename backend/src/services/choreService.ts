@@ -4,7 +4,9 @@ import { choreAssignments, chores, choreZones, users, zones } from '../db/schema
 import type { ChoreType } from '../db/schema.js';
 import {
   CannotAssignOthersError,
+  CannotUnassignOthersError,
   ChoreAlreadyAssignedError,
+  ChoreAssignmentNotFoundError,
   ChoreNotAssignableError,
   ChoreNotFoundError,
   ChoreZoneMismatchError,
@@ -196,6 +198,37 @@ export function assignChore(
 
     tx.insert(choreAssignments).values({ choreId, zoneId, userId: assigneeUserId, createdAt: now }).run();
   });
+
+  return attachDetailsToOne(chore);
+}
+
+export function unassignChore(
+  householdId: number,
+  choreId: number,
+  requestingUserId: number,
+  assignmentId: number,
+): ChoreSummary {
+  const requesterRole = requireMembership(householdId, requestingUserId);
+
+  const chore = db
+    .select({ id: chores.id, name: chores.name, type: chores.type })
+    .from(chores)
+    .where(and(eq(chores.id, choreId), eq(chores.householdId, householdId)))
+    .get();
+  if (!chore) throw new ChoreNotFoundError();
+
+  const assignment = db
+    .select({ id: choreAssignments.id, userId: choreAssignments.userId })
+    .from(choreAssignments)
+    .where(and(eq(choreAssignments.id, assignmentId), eq(choreAssignments.choreId, choreId)))
+    .get();
+  if (!assignment) throw new ChoreAssignmentNotFoundError();
+
+  if (requesterRole !== 'head' && assignment.userId !== requestingUserId) {
+    throw new CannotUnassignOthersError();
+  }
+
+  db.delete(choreAssignments).where(eq(choreAssignments.id, assignmentId)).run();
 
   return attachDetailsToOne(chore);
 }

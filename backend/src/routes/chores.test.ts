@@ -492,3 +492,181 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
     ]);
   });
 });
+
+describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assignmentId', () => {
+  let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
+  let member: Awaited<ReturnType<typeof registerAndJoin>>;
+  let otherMember: Awaited<ReturnType<typeof registerAndJoin>>;
+  let memberId: number;
+  let otherMemberId: number;
+  let kitchenZoneId: number;
+
+  beforeAll(async () => {
+    head = await registerHeadOfHousehold('unassign-hoh@example.com', 'Unassign House');
+    member = await registerAndJoin('unassign-member@example.com', head.joinCode);
+    otherMember = await registerAndJoin('unassign-member-2@example.com', head.joinCode);
+    memberId = await meId(member.cookie);
+    otherMemberId = await meId(otherMember.cookie);
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
+  });
+
+  async function meId(cookie: string): Promise<number> {
+    const response = await request(app).get('/api/auth/me').set('Cookie', cookie);
+    return response.body.user.id;
+  }
+
+  async function postChore(body: Record<string, unknown>) {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send(body);
+    return response.body.chore;
+  }
+
+  async function assign(choreId: number, cookie: string, body: Record<string, unknown>) {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores/${choreId}/assignments`)
+      .set('Cookie', cookie)
+      .send(body);
+    return response.body.chore;
+  }
+
+  it('lets a member unassign their own whole-chore assignment', async () => {
+    const chore = await postChore({ name: 'Vacuum', type: 'single-time', zoneIds: [] });
+    const assigned = await assign(chore.id, head.cookie, { userId: memberId });
+    const assignmentId = assigned.assignments[0].id;
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.assignments).toEqual([]);
+  });
+
+  it('lets a member unassign their own zone-scoped assignment', async () => {
+    const chore = await postChore({ name: 'Wash dishes', type: 'single-time', zoneIds: [kitchenZoneId] });
+    const assigned = await assign(chore.id, head.cookie, { userId: memberId, zoneId: kitchenZoneId });
+    const assignmentId = assigned.assignments[0].id;
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.assignments).toEqual([]);
+  });
+
+  it('lets the head unassign someone else', async () => {
+    const chore = await postChore({ name: 'Mop floor', type: 'single-time', zoneIds: [] });
+    const assigned = await assign(chore.id, head.cookie, { userId: memberId });
+    const assignmentId = assigned.assignments[0].id;
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.assignments).toEqual([]);
+  });
+
+  it('rejects a member unassigning someone else with 403', async () => {
+    const chore = await postChore({ name: 'Take out trash', type: 'single-time', zoneIds: [] });
+    const assigned = await assign(chore.id, head.cookie, { userId: otherMemberId });
+    const assignmentId = assigned.assignments[0].id;
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('CannotUnassignOthers');
+
+    const stillThere = await request(app)
+      .get(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie);
+    const listed = (stillThere.body.chores as { id: number; assignments: unknown[] }[]).find(
+      (candidate) => candidate.id === chore.id,
+    );
+    expect(listed?.assignments).toHaveLength(1);
+  });
+
+  it('rejects a non-existent assignment id with 404', async () => {
+    const chore = await postChore({ name: 'Clean windows', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/999999`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('ChoreAssignmentNotFound');
+  });
+
+  it('rejects an assignment id that belongs to a different chore with 404', async () => {
+    const choreA = await postChore({ name: 'Dust shelves', type: 'single-time', zoneIds: [] });
+    const choreB = await postChore({ name: 'Sweep porch', type: 'single-time', zoneIds: [] });
+    const assignedA = await assign(choreA.id, head.cookie, { userId: memberId });
+    const assignmentId = assignedA.assignments[0].id;
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${choreB.id}/assignments/${assignmentId}`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('ChoreAssignmentNotFound');
+  });
+
+  it('rejects a non-existent chore id with 404', async () => {
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/999999/assignments/1`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('ChoreNotFound');
+  });
+
+  it('rejects a non-member of the household with a generic 404', async () => {
+    const chore = await postChore({ name: 'Water plants', type: 'single-time', zoneIds: [] });
+    const assigned = await assign(chore.id, head.cookie, { userId: memberId });
+    const assignmentId = assigned.assignments[0].id;
+    const outsider = await registerHeadOfHousehold('unassign-outsider@example.com', 'Outsider House');
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`)
+      .set('Cookie', outsider.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('HouseholdNotFound');
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const chore = await postChore({ name: 'Feed the cat', type: 'single-time', zoneIds: [] });
+    const assigned = await assign(chore.id, head.cookie, { userId: memberId });
+    const assignmentId = assigned.assignments[0].id;
+
+    const response = await request(app).delete(
+      `/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`,
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('allows re-assigning the same target after unassigning it', async () => {
+    const chore = await postChore({ name: 'Iron shirts', type: 'single-time', zoneIds: [] });
+    const assigned = await assign(chore.id, head.cookie, { userId: memberId });
+    const assignmentId = assigned.assignments[0].id;
+
+    await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/${assignmentId}`)
+      .set('Cookie', head.cookie);
+
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', head.cookie)
+      .send({ userId: memberId });
+
+    expect(response.status).toBe(201);
+    expect(response.body.chore.assignments).toHaveLength(1);
+  });
+});

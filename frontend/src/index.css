@@ -761,6 +761,9 @@ fieldset.form-field legend,
 }
 
 .assignee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--ink);
@@ -768,6 +771,34 @@ fieldset.form-field legend,
   border-radius: 999px;
   padding: 2px 8px;
   white-space: nowrap;
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.chip-remove:hover:not(:disabled) {
+  opacity: 1;
+  background: color-mix(in srgb, var(--error) 20%, transparent);
+  color: var(--error);
+}
+
+.chip-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .assign-add-btn {

@@ -35,3 +35,15 @@ export async function assignChore(
   );
   return response.chore;
 }
+
+export async function unassignChore(
+  householdId: number,
+  choreId: number,
+  assignmentId: number,
+): Promise<Chore> {
+  const response = await apiRequest<{ chore: Chore }>(
+    `/api/households/${householdId}/chores/${choreId}/assignments/${assignmentId}`,
+    { method: 'DELETE' },
+  );
+  return response.chore;
+}

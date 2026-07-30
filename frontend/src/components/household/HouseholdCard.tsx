@@ -19,6 +19,7 @@ export function HouseholdCard({ household }: { household: Household }) {
   const [choresError, setChoresError] = useState<string | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
+  const [unassigningId, setUnassigningId] = useState<number | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +86,19 @@ export function HouseholdCard({ household }: { household: Household }) {
     }
   }
 
+  async function handleUnassign(choreId: number, assignmentId: number) {
+    setUnassigningId(assignmentId);
+    setAssignError(null);
+    try {
+      const updated = await choreApi.unassignChore(household.id, choreId, assignmentId);
+      setChores((prev) => prev?.map((chore) => (chore.id === choreId ? updated : chore)) ?? prev);
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not unassign that chore.');
+    } finally {
+      setUnassigningId(null);
+    }
+  }
+
   if (state.status !== 'authenticated') return null;
   const isHead = household.role === 'head';
 
@@ -100,6 +114,8 @@ export function HouseholdCard({ household }: { household: Household }) {
           isHead={isHead}
           assigningKey={assigningKey}
           onAssign={(choreId, userId, zoneId) => void handleAssign(choreId, userId, zoneId)}
+          unassigningId={unassigningId}
+          onUnassign={(choreId, assignmentId) => void handleUnassign(choreId, assignmentId)}
         />
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>

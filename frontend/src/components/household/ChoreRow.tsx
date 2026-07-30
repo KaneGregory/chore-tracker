@@ -10,6 +10,8 @@ interface ChoreRowProps {
   isHead: boolean;
   assigningKey: string | null;
   onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
+  unassigningId: number | null;
+  onUnassign: (choreId: number, assignmentId: number) => void;
 }
 
 export function ChoreRow({
@@ -20,6 +22,8 @@ export function ChoreRow({
   isHead,
   assigningKey,
   onAssign,
+  unassigningId,
+  onUnassign,
 }: ChoreRowProps) {
   const isAssignable = chore.type === 'single-time';
 
@@ -45,6 +49,8 @@ export function ChoreRow({
               isHead={isHead}
               assigningKey={assigningKey}
               onAssign={onAssign}
+              unassigningId={unassigningId}
+              onUnassign={onUnassign}
             />
           )}
         </div>
@@ -64,6 +70,8 @@ export function ChoreRow({
                   isHead={isHead}
                   assigningKey={assigningKey}
                   onAssign={onAssign}
+                  unassigningId={unassigningId}
+                  onUnassign={onUnassign}
                 />
               )}
             </span>

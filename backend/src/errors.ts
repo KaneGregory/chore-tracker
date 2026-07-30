@@ -113,3 +113,15 @@ export class ChoreAlreadyAssignedError extends AppError {
     super(409, 'ChoreAlreadyAssigned', 'That person is already assigned to this chore');
   }
 }
+
+export class ChoreAssignmentNotFoundError extends AppError {
+  constructor() {
+    super(404, 'ChoreAssignmentNotFound', 'That assignment was not found');
+  }
+}
+
+export class CannotUnassignOthersError extends AppError {
+  constructor() {
+    super(403, 'CannotUnassignOthers', 'Only a Head of Household can unassign someone else');
+  }
+}

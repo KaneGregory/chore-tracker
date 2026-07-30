@@ -10,6 +10,8 @@ interface ChoresListProps {
   isHead: boolean;
   assigningKey: string | null;
   onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
+  unassigningId: number | null;
+  onUnassign: (choreId: number, assignmentId: number) => void;
 }
 
 export function ChoresList({
@@ -20,6 +22,8 @@ export function ChoresList({
   isHead,
   assigningKey,
   onAssign,
+  unassigningId,
+  onUnassign,
 }: ChoresListProps) {
   if (chores.length === 0) {
     return <p className="chores-empty">No chores yet.</p>;
@@ -37,6 +41,8 @@ export function ChoresList({
           isHead={isHead}
           assigningKey={assigningKey}
           onAssign={onAssign}
+          unassigningId={unassigningId}
+          onUnassign={onUnassign}
         />
       ))}
     </ul>
