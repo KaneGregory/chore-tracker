@@ -32,3 +32,18 @@ export const assignmentParamsSchema = z.object({
   choreId: idParam,
   assignmentId: idParam,
 });
+
+// 'overdue' isn't user-settable yet — it'll be computed once due dates exist.
+export const settableChoreStatusSchema = z.enum(['to-do', 'complete']);
+
+export const setChoreStatusSchema = z.object({
+  status: settableChoreStatusSchema,
+});
+
+export type SetChoreStatusInput = z.infer<typeof setChoreStatusSchema>;
+
+export const choreZoneParamsSchema = z.object({
+  householdId: idParam,
+  choreId: idParam,
+  zoneId: idParam,
+});

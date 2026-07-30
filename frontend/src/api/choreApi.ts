@@ -1,5 +1,5 @@
 import { apiRequest } from './httpClient';
-import type { Chore, ChoreType } from '../types/chore';
+import type { Chore, ChoreType, SettableChoreStatus } from '../types/chore';
 
 interface ChoresResponse {
   chores: Chore[];
@@ -44,6 +44,31 @@ export async function unassignChore(
   const response = await apiRequest<{ chore: Chore }>(
     `/api/households/${householdId}/chores/${choreId}/assignments/${assignmentId}`,
     { method: 'DELETE' },
+  );
+  return response.chore;
+}
+
+export async function setChoreStatus(
+  householdId: number,
+  choreId: number,
+  status: SettableChoreStatus,
+): Promise<Chore> {
+  const response = await apiRequest<{ chore: Chore }>(
+    `/api/households/${householdId}/chores/${choreId}/status`,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
+  );
+  return response.chore;
+}
+
+export async function setChoreZoneStatus(
+  householdId: number,
+  choreId: number,
+  zoneId: number,
+  status: SettableChoreStatus,
+): Promise<Chore> {
+  const response = await apiRequest<{ chore: Chore }>(
+    `/api/households/${householdId}/chores/${choreId}/zones/${zoneId}/status`,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
   );
   return response.chore;
 }

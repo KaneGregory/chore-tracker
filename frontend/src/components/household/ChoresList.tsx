@@ -1,4 +1,4 @@
-import type { Chore } from '../../types/chore';
+import type { Chore, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { ChoreRow } from './ChoreRow';
 
@@ -12,6 +12,8 @@ interface ChoresListProps {
   onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
   unassigningId: number | null;
   onUnassign: (choreId: number, assignmentId: number) => void;
+  statusUpdatingKey: string | null;
+  onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
 }
 
 export function ChoresList({
@@ -24,6 +26,8 @@ export function ChoresList({
   onAssign,
   unassigningId,
   onUnassign,
+  statusUpdatingKey,
+  onSetStatus,
 }: ChoresListProps) {
   if (chores.length === 0) {
     return <p className="chores-empty">No chores yet.</p>;
@@ -43,6 +47,8 @@ export function ChoresList({
           onAssign={onAssign}
           unassigningId={unassigningId}
           onUnassign={onUnassign}
+          statusUpdatingKey={statusUpdatingKey}
+          onSetStatus={onSetStatus}
         />
       ))}
     </ul>

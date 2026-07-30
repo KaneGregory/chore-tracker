@@ -104,7 +104,8 @@ describe('POST /api/households/:householdId/chores', () => {
       id: expect.any(Number),
       name: 'Take out trash',
       type: 'single-time',
-      zoneIds: [],
+      status: 'to-do',
+      zones: [],
       assignments: [],
     });
   });
@@ -116,7 +117,7 @@ describe('POST /api/households/:householdId/chores', () => {
       .send({ name: 'Water the plants', type: 'forever' });
 
     expect(response.status).toBe(201);
-    expect(response.body.chore.zoneIds).toEqual([]);
+    expect(response.body.chore.zones).toEqual([]);
   });
 
   it('assigns a chore to a single zone', async () => {
@@ -126,7 +127,7 @@ describe('POST /api/households/:householdId/chores', () => {
       .send({ name: 'Wash dishes', type: 'forever', zoneIds: [kitchenZoneId] });
 
     expect(response.status).toBe(201);
-    expect(response.body.chore.zoneIds).toEqual([kitchenZoneId]);
+    expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'to-do' }]);
   });
 
   it('assigns a chore to multiple zones', async () => {
@@ -138,7 +139,10 @@ describe('POST /api/households/:householdId/chores', () => {
       .send({ name: 'Deep clean', type: 'single-time', zoneIds: [kitchenZoneId, bathroomZoneId] });
 
     expect(response.status).toBe(201);
-    expect(response.body.chore.zoneIds.sort()).toEqual([kitchenZoneId, bathroomZoneId].sort());
+    const zoneIds = (response.body.chore.zones as { zoneId: number }[])
+      .map((zone) => zone.zoneId)
+      .sort();
+    expect(zoneIds).toEqual([kitchenZoneId, bathroomZoneId].sort());
   });
 
   it('dedupes repeated zone ids in the request', async () => {
@@ -148,7 +152,7 @@ describe('POST /api/households/:householdId/chores', () => {
       .send({ name: 'Sweep floor', type: 'forever', zoneIds: [kitchenZoneId, kitchenZoneId] });
 
     expect(response.status).toBe(201);
-    expect(response.body.chore.zoneIds).toEqual([kitchenZoneId]);
+    expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'to-do' }]);
   });
 
   it('rejects a non-head member with 403', async () => {
@@ -236,7 +240,8 @@ describe('GET /api/households/:householdId/chores', () => {
         id: expect.any(Number),
         name: 'Vacuum',
         type: 'forever',
-        zoneIds: [rootZoneId],
+        status: 'to-do',
+        zones: [{ zoneId: rootZoneId, status: 'to-do' }],
         assignments: [],
       },
     ]);
@@ -668,5 +673,223 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
 
     expect(response.status).toBe(201);
     expect(response.body.chore.assignments).toHaveLength(1);
+  });
+});
+
+describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
+  let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
+  let member: Awaited<ReturnType<typeof registerAndJoin>>;
+  let kitchenZoneId: number;
+
+  beforeAll(async () => {
+    head = await registerHeadOfHousehold('status-hoh@example.com', 'Status House');
+    member = await registerAndJoin('status-member@example.com', head.joinCode);
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
+  });
+
+  async function postChore(body: Record<string, unknown>) {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send(body);
+    return response.body.chore;
+  }
+
+  it('lets a member mark a zoneless chore complete, and back to to-do', async () => {
+    const chore = await postChore({ name: 'Vacuum', type: 'single-time', zoneIds: [] });
+
+    const completed = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'complete' });
+
+    expect(completed.status).toBe(200);
+    expect(completed.body.chore.status).toBe('complete');
+
+    const reverted = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'to-do' });
+
+    expect(reverted.status).toBe(200);
+    expect(reverted.body.chore.status).toBe('to-do');
+  });
+
+  it('rejects setting status on a chore that has zones with 400', async () => {
+    const chore = await postChore({
+      name: 'Wash dishes',
+      type: 'single-time',
+      zoneIds: [kitchenZoneId],
+    });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ChoreStatusManagedByZones');
+  });
+
+  it('rejects an invalid status value with 400', async () => {
+    const chore = await postChore({ name: 'Mop floor', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('rejects a non-existent chore id with 404', async () => {
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/999999/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('ChoreNotFound');
+  });
+
+  it('rejects a non-member of the household with a generic 404', async () => {
+    const chore = await postChore({ name: 'Dust shelves', type: 'single-time', zoneIds: [] });
+    const outsider = await registerHeadOfHousehold('status-outsider@example.com', 'Outsider House');
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', outsider.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('HouseholdNotFound');
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const chore = await postChore({ name: 'Feed the cat', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/status', () => {
+  let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
+  let member: Awaited<ReturnType<typeof registerAndJoin>>;
+  let kitchenZoneId: number;
+  let bathroomZoneId: number;
+
+  beforeAll(async () => {
+    head = await registerHeadOfHousehold('zonestatus-hoh@example.com', 'Zone Status House');
+    member = await registerAndJoin('zonestatus-member@example.com', head.joinCode);
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
+    bathroomZoneId = await createZone(head.householdId, head.cookie, 'Bathroom', rootZoneId);
+  });
+
+  async function postChore(body: Record<string, unknown>) {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send(body);
+    return response.body.chore;
+  }
+
+  it('lets a member mark one of a chore’s zones complete', async () => {
+    const chore = await postChore({
+      name: 'Wash dishes',
+      type: 'single-time',
+      zoneIds: [kitchenZoneId],
+    });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'complete' }]);
+    expect(response.body.chore.status).toBe('complete');
+  });
+
+  it('keeps the chore at to-do until every zone is complete', async () => {
+    const chore = await postChore({
+      name: 'Deep clean',
+      type: 'single-time',
+      zoneIds: [kitchenZoneId, bathroomZoneId],
+    });
+
+    const afterFirst = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+    expect(afterFirst.body.chore.status).toBe('to-do');
+
+    const afterSecond = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${bathroomZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+    expect(afterSecond.body.chore.status).toBe('complete');
+  });
+
+  it('rejects a zone that is not one of the chore’s zones with 400', async () => {
+    const chore = await postChore({ name: 'Sweep', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ChoreZoneMismatch');
+  });
+
+  it('rejects a non-existent chore id with 404', async () => {
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/999999/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('ChoreNotFound');
+  });
+
+  it('rejects a non-member of the household with a generic 404', async () => {
+    const chore = await postChore({
+      name: 'Water plants',
+      type: 'single-time',
+      zoneIds: [kitchenZoneId],
+    });
+    const outsider = await registerHeadOfHousehold(
+      'zonestatus-outsider@example.com',
+      'Outsider House',
+    );
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', outsider.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('HouseholdNotFound');
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const chore = await postChore({
+      name: 'Take out recycling',
+      type: 'single-time',
+      zoneIds: [kitchenZoneId],
+    });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(401);
   });
 });

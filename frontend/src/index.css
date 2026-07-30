@@ -735,6 +735,54 @@ fieldset.form-field legend,
   background: color-mix(in srgb, var(--accent-2) 15%, transparent);
 }
 
+.chore-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.chore-status-to-do {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 15%, transparent);
+}
+
+.chore-status-complete {
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 15%, transparent);
+}
+
+.chore-status-overdue {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 15%, transparent);
+}
+
+.status-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.status-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent-2);
+  cursor: pointer;
+}
+
+.status-toggle input:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .zone-tags {
   display: flex;
   flex-wrap: wrap;

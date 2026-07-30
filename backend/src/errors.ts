@@ -125,3 +125,13 @@ export class CannotUnassignOthersError extends AppError {
     super(403, 'CannotUnassignOthers', 'Only a Head of Household can unassign someone else');
   }
 }
+
+export class ChoreStatusManagedByZonesError extends AppError {
+  constructor() {
+    super(
+      400,
+      'ChoreStatusManagedByZones',
+      'This chore has zones — mark those complete individually',
+    );
+  }
+}

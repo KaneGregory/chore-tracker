@@ -51,6 +51,11 @@ export const zones = sqliteTable('zones', {
 export const CHORE_TYPES = ['single-time', 'forever'] as const;
 export type ChoreType = (typeof CHORE_TYPES)[number];
 
+// 'overdue' isn't computed or settable yet — the column exists now so the future
+// due-date/scheduling work that produces it doesn't need another migration.
+export const CHORE_STATUSES = ['to-do', 'complete', 'overdue'] as const;
+export type ChoreStatus = (typeof CHORE_STATUSES)[number];
+
 export const chores = sqliteTable('chores', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   householdId: integer('household_id')
@@ -60,6 +65,9 @@ export const chores = sqliteTable('chores', {
   // How single-time vs. forever chores actually behave differently is future work —
   // for now this just records which one a chore is.
   type: text('type', { enum: CHORE_TYPES }).notNull(),
+  // Only meaningful when the chore has no zones — a chore with zones takes its status
+  // from them instead (see choreService.deriveChoreStatus).
+  status: text('status', { enum: CHORE_STATUSES }).notNull().default('to-do'),
   createdAt: integer('created_at').notNull(),
 });
 
@@ -73,6 +81,7 @@ export const choreZones = sqliteTable(
     zoneId: integer('zone_id')
       .notNull()
       .references(() => zones.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: CHORE_STATUSES }).notNull().default('to-do'),
   },
   (table) => [unique().on(table.choreId, table.zoneId)],
 );

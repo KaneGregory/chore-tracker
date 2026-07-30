@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { choreAssignments, chores, choreZones, users, zones } from '../db/schema.js';
-import type { ChoreType } from '../db/schema.js';
+import type { ChoreStatus, ChoreType } from '../db/schema.js';
 import {
   CannotAssignOthersError,
   CannotUnassignOthersError,
@@ -9,6 +9,7 @@ import {
   ChoreAssignmentNotFoundError,
   ChoreNotAssignableError,
   ChoreNotFoundError,
+  ChoreStatusManagedByZonesError,
   ChoreZoneMismatchError,
   MemberNotFoundError,
   ZoneNotFoundError,
@@ -22,30 +23,65 @@ export interface ChoreAssignmentSummary {
   zoneId: number | null;
 }
 
+export interface ChoreZoneStatus {
+  zoneId: number;
+  status: ChoreStatus;
+}
+
 export interface ChoreSummary {
   id: number;
   name: string;
   type: ChoreType;
-  zoneIds: number[];
+  status: ChoreStatus;
+  zones: ChoreZoneStatus[];
   assignments: ChoreAssignmentSummary[];
 }
 
-function attachDetails(choreRows: { id: number; name: string; type: ChoreType }[]): ChoreSummary[] {
+type ChoreRow = { id: number; name: string; type: ChoreType; status: ChoreStatus };
+
+const CHORE_ROW_COLUMNS = {
+  id: chores.id,
+  name: chores.name,
+  type: chores.type,
+  status: chores.status,
+};
+
+// Lowest-to-highest: overdue is the worst outstanding state, complete the best. A
+// chore with zones takes the lowest (worst) of its zones' statuses, per the rule that
+// a chore isn't done until every one of its zones is.
+const STATUS_RANK: Record<ChoreStatus, number> = { overdue: 0, 'to-do': 1, complete: 2 };
+
+function deriveChoreStatus(ownStatus: ChoreStatus, zoneStatuses: ChoreStatus[]): ChoreStatus {
+  if (zoneStatuses.length === 0) return ownStatus;
+  return zoneStatuses.reduce((lowest, status) =>
+    STATUS_RANK[status] < STATUS_RANK[lowest] ? status : lowest,
+  );
+}
+
+function findChoreInHousehold(householdId: number, choreId: number): ChoreRow | undefined {
+  return db
+    .select(CHORE_ROW_COLUMNS)
+    .from(chores)
+    .where(and(eq(chores.id, choreId), eq(chores.householdId, householdId)))
+    .get();
+}
+
+function attachDetails(choreRows: ChoreRow[]): ChoreSummary[] {
   if (choreRows.length === 0) return [];
 
   const choreIds = choreRows.map((row) => row.id);
 
   const zoneLinks = db
-    .select({ choreId: choreZones.choreId, zoneId: choreZones.zoneId })
+    .select({ choreId: choreZones.choreId, zoneId: choreZones.zoneId, status: choreZones.status })
     .from(choreZones)
     .where(inArray(choreZones.choreId, choreIds))
     .all();
 
-  const zoneIdsByChore = new Map<number, number[]>();
+  const zonesByChore = new Map<number, ChoreZoneStatus[]>();
   for (const link of zoneLinks) {
-    const ids = zoneIdsByChore.get(link.choreId) ?? [];
-    ids.push(link.zoneId);
-    zoneIdsByChore.set(link.choreId, ids);
+    const list = zonesByChore.get(link.choreId) ?? [];
+    list.push({ zoneId: link.zoneId, status: link.status });
+    zonesByChore.set(link.choreId, list);
   }
 
   const assignmentRows = db
@@ -68,16 +104,25 @@ function attachDetails(choreRows: { id: number; name: string; type: ChoreType }[
     assignmentsByChore.set(row.choreId, list);
   }
 
-  return choreRows.map((row) => ({
-    ...row,
-    zoneIds: zoneIdsByChore.get(row.id) ?? [],
-    assignments: assignmentsByChore.get(row.id) ?? [],
-  }));
+  return choreRows.map((row) => {
+    const zones = zonesByChore.get(row.id) ?? [];
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      status: deriveChoreStatus(
+        row.status,
+        zones.map((zone) => zone.status),
+      ),
+      zones,
+      assignments: assignmentsByChore.get(row.id) ?? [],
+    };
+  });
 }
 
 // attachDetails is written for the list case; this re-attaches details to a single
 // already-fetched chore row, which always yields exactly one result.
-function attachDetailsToOne(choreRow: { id: number; name: string; type: ChoreType }): ChoreSummary {
+function attachDetailsToOne(choreRow: ChoreRow): ChoreSummary {
   return attachDetails([choreRow])[0]!;
 }
 
@@ -87,11 +132,7 @@ export function listChoresForRequester(
 ): ChoreSummary[] {
   requireMembership(householdId, requestingUserId);
 
-  const rows = db
-    .select({ id: chores.id, name: chores.name, type: chores.type })
-    .from(chores)
-    .where(eq(chores.householdId, householdId))
-    .all();
+  const rows = db.select(CHORE_ROW_COLUMNS).from(chores).where(eq(chores.householdId, householdId)).all();
 
   return attachDetails(rows);
 }
@@ -132,7 +173,7 @@ export function createChore(
     return inserted;
   });
 
-  return attachDetailsToOne({ id: chore.id, name: chore.name, type: chore.type });
+  return attachDetailsToOne(chore);
 }
 
 export function assignChore(
@@ -147,11 +188,7 @@ export function assignChore(
     throw new CannotAssignOthersError();
   }
 
-  const chore = db
-    .select({ id: chores.id, name: chores.name, type: chores.type })
-    .from(chores)
-    .where(and(eq(chores.id, choreId), eq(chores.householdId, householdId)))
-    .get();
+  const chore = findChoreInHousehold(householdId, choreId);
   if (!chore) throw new ChoreNotFoundError();
   if (chore.type !== 'single-time') throw new ChoreNotAssignableError();
 
@@ -210,11 +247,7 @@ export function unassignChore(
 ): ChoreSummary {
   const requesterRole = requireMembership(householdId, requestingUserId);
 
-  const chore = db
-    .select({ id: chores.id, name: chores.name, type: chores.type })
-    .from(chores)
-    .where(and(eq(chores.id, choreId), eq(chores.householdId, householdId)))
-    .get();
+  const chore = findChoreInHousehold(householdId, choreId);
   if (!chore) throw new ChoreNotFoundError();
 
   const assignment = db
@@ -229,6 +262,53 @@ export function unassignChore(
   }
 
   db.delete(choreAssignments).where(eq(choreAssignments.id, assignmentId)).run();
+
+  return attachDetailsToOne(chore);
+}
+
+export function setChoreStatus(
+  householdId: number,
+  choreId: number,
+  requestingUserId: number,
+  status: 'to-do' | 'complete',
+): ChoreSummary {
+  requireMembership(householdId, requestingUserId);
+
+  const chore = findChoreInHousehold(householdId, choreId);
+  if (!chore) throw new ChoreNotFoundError();
+
+  const anyZoneLink = db
+    .select({ id: choreZones.id })
+    .from(choreZones)
+    .where(eq(choreZones.choreId, choreId))
+    .get();
+  if (anyZoneLink) throw new ChoreStatusManagedByZonesError();
+
+  db.update(chores).set({ status }).where(eq(chores.id, choreId)).run();
+
+  return attachDetailsToOne({ ...chore, status });
+}
+
+export function setChoreZoneStatus(
+  householdId: number,
+  choreId: number,
+  zoneId: number,
+  requestingUserId: number,
+  status: 'to-do' | 'complete',
+): ChoreSummary {
+  requireMembership(householdId, requestingUserId);
+
+  const chore = findChoreInHousehold(householdId, choreId);
+  if (!chore) throw new ChoreNotFoundError();
+
+  const link = db
+    .select({ id: choreZones.id })
+    .from(choreZones)
+    .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
+    .get();
+  if (!link) throw new ChoreZoneMismatchError();
+
+  db.update(choreZones).set({ status }).where(eq(choreZones.id, link.id)).run();
 
   return attachDetailsToOne(chore);
 }

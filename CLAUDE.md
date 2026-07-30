@@ -103,6 +103,19 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   join table (`chore_zones`) — zero, one, or many zones, no constraint either way.
   Same view/mutate split as members and zones (any member views, Head of Household
   creates), authorized via the same `membershipAuth.ts` helpers.
+* Chores (and, separately, each chore-zone link) have a `status`:
+  `'to-do' | 'complete' | 'overdue'`. Only `'to-do'` and `'complete'` are settable via
+  the API right now — `'overdue'` exists in the column/type today so the future
+  due-date work that computes it doesn't need another migration, but nothing sets it
+  yet. A chore with zones takes its status from them, not its own `status` column:
+  it's always the lowest-ranked status among its zones (`overdue` < `to-do` <
+  `complete`), computed on read in `choreService.deriveChoreStatus` — PATCHing a
+  zoned chore's own `/status` endpoint is rejected (`ChoreStatusManagedByZones`);
+  only its zones (`/chores/:choreId/zones/:zoneId/status`) can be marked. Marking
+  complete is authorized as "any household member," not Head-of-Household-only —
+  unlike creating a chore, this was a judgment call (completing a chore reads as a
+  routine cooperative action, not an admin one) rather than something explicitly
+  specified, so revisit it if that's wrong.
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
   for installability (manifest + service worker).
@@ -176,11 +189,14 @@ Run from within `backend/` or `frontend/` unless noted:
 * Removing a zone cascades to everything nested inside it, with no undo — an inline
   "are you sure" confirmation guards this in the UI, but there's no soft-delete or
   recovery if someone confirms by mistake.
-* Chores can only be created, not edited, removed, or completed/checked off yet —
-  only creation was asked for this round. There's no chore detail view either, just
-  the flat list shown alongside the create form; anything richer (filtering by zone,
-  editing, completion tracking) is future work along with how the two chore types
-  actually differ.
+* Chores can be created, assigned/unassigned, and marked to-do/complete, but not
+  edited or removed yet. Assignment (many-to-many) is single-time chores only for
+  now — forever chores need their own not-yet-decided assignment rules — but
+  completion applies to both types equally, per what was actually asked. There's no
+  chore detail view either, just the flat list on the home page; anything richer
+  (filtering by zone, editing) is future work along with how the two chore types
+  actually differ day-to-day, and along with `'overdue'` status computation once due
+  dates exist.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a

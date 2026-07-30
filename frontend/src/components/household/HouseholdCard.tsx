@@ -9,7 +9,7 @@ import { ApiError } from '../../api/httpClient';
 import { flattenZones } from '../../utils/zoneTree';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
-import type { Chore } from '../../types/chore';
+import type { Chore, SettableChoreStatus } from '../../types/chore';
 
 export function HouseholdCard({ household }: { household: Household }) {
   const { state } = useAuth();
@@ -20,6 +20,7 @@ export function HouseholdCard({ household }: { household: Household }) {
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
   const [unassigningId, setUnassigningId] = useState<number | null>(null);
+  const [statusUpdatingKey, setStatusUpdatingKey] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,6 +100,27 @@ export function HouseholdCard({ household }: { household: Household }) {
     }
   }
 
+  async function handleSetStatus(
+    choreId: number,
+    zoneId: number | null,
+    status: SettableChoreStatus,
+  ) {
+    const key = `${choreId}:${zoneId ?? 'none'}`;
+    setStatusUpdatingKey(key);
+    setAssignError(null);
+    try {
+      const updated =
+        zoneId === null
+          ? await choreApi.setChoreStatus(household.id, choreId, status)
+          : await choreApi.setChoreZoneStatus(household.id, choreId, zoneId, status);
+      setChores((prev) => prev?.map((chore) => (chore.id === choreId ? updated : chore)) ?? prev);
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not update that status.');
+    } finally {
+      setStatusUpdatingKey(null);
+    }
+  }
+
   if (state.status !== 'authenticated') return null;
   const isHead = household.role === 'head';
 
@@ -116,6 +138,10 @@ export function HouseholdCard({ household }: { household: Household }) {
           onAssign={(choreId, userId, zoneId) => void handleAssign(choreId, userId, zoneId)}
           unassigningId={unassigningId}
           onUnassign={(choreId, assignmentId) => void handleUnassign(choreId, assignmentId)}
+          statusUpdatingKey={statusUpdatingKey}
+          onSetStatus={(choreId, zoneId, status) =>
+            void handleSetStatus(choreId, zoneId, status)
+          }
         />
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>
