@@ -7,11 +7,18 @@ import * as choreApi from '../../api/choreApi';
 import * as householdApi from '../../api/householdApi';
 import { ApiError } from '../../api/httpClient';
 import { flattenZones } from '../../utils/zoneTree';
+import { filterChores } from '../../utils/choreFilter';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
-import type { Chore, SettableChoreStatus } from '../../types/chore';
+import type { Chore, ChoreFilter, SettableChoreStatus } from '../../types/chore';
 
-export function HouseholdCard({ household }: { household: Household }) {
+export function HouseholdCard({
+  household,
+  filter,
+}: {
+  household: Household;
+  filter: ChoreFilter;
+}) {
   const { state } = useAuth();
   const [zoneTree, setZoneTree] = useState<Zone | null>(null);
   const [zoneError, setZoneError] = useState<string | null>(null);
@@ -142,7 +149,8 @@ export function HouseholdCard({ household }: { household: Household }) {
       <ErrorBanner message={zoneError ?? choresError ?? assignError} />
       {chores && zoneTree ? (
         <ChoresList
-          chores={chores}
+          chores={filterChores(chores, filter, state.user.id)}
+          allChoresCount={chores.length}
           zoneNameById={new Map(flattenZones(zoneTree).map((zone) => [zone.id, zone.name]))}
           members={members}
           currentUserId={state.user.id}

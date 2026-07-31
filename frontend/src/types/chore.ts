@@ -21,3 +21,6 @@ export interface Chore {
   zones: ChoreZoneStatus[];
   assignments: ChoreAssignment[];
 }
+
+// 'mine' resolves to the current user; a number filters to that specific member.
+export type ChoreFilter = 'all' | 'mine' | number;

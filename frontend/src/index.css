@@ -437,6 +437,24 @@ a {
   margin: 0;
 }
 
+.page-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chore-filter-select {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  background: var(--card);
+  color: var(--ink);
+}
+
 .btn-fab {
   display: inline-flex;
   align-items: center;

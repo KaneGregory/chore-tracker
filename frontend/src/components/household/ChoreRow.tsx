@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Chore, SettableChoreStatus } from '../../types/chore';
+import type { Chore, ChoreStatus, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
 import { ChoreZoneSection } from './ChoreZoneSection';
@@ -7,6 +7,8 @@ import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreRowProps {
   chore: Chore;
+  visibleZoneIds: number[] | null;
+  displayStatus: ChoreStatus;
   zoneNameById: Map<number, string>;
   members: HouseholdMember[];
   currentUserId: number;
@@ -23,6 +25,8 @@ interface ChoreRowProps {
 
 export function ChoreRow({
   chore,
+  visibleZoneIds,
+  displayStatus,
   zoneNameById,
   members,
   currentUserId,
@@ -37,9 +41,12 @@ export function ChoreRow({
   onRemove,
 }: ChoreRowProps) {
   const hasZones = chore.zones.length > 0;
+  const visibleZones = visibleZoneIds
+    ? chore.zones.filter((zone) => visibleZoneIds.includes(zone.zoneId))
+    : chore.zones;
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const isRemoving = removingChoreId === chore.id;
-  const isComplete = chore.status === 'complete';
+  const isComplete = displayStatus === 'complete';
   const isUpdatingStatus = statusUpdatingKey === `${chore.id}:none`;
 
   function assignmentsFor(zoneId: number | null) {
@@ -47,7 +54,7 @@ export function ChoreRow({
   }
 
   return (
-    <li className={`chore-card status-${chore.status}`}>
+    <li className={`chore-card status-${displayStatus}`}>
       {isHead && !confirmingRemove && (
         <button
           type="button"
@@ -60,8 +67,8 @@ export function ChoreRow({
       )}
       <div className="chore-row-main">
         <span className="chore-name">{chore.name}</span>
-        <span className={`chore-status-badge chore-status-${chore.status}`}>
-          {CHORE_STATUS_LABEL[chore.status]}
+        <span className={`chore-status-badge chore-status-${displayStatus}`}>
+          {CHORE_STATUS_LABEL[displayStatus]}
         </span>
       </div>
       {confirmingRemove && (
@@ -109,7 +116,7 @@ export function ChoreRow({
       )}
       {hasZones && (
         <ul className="chore-zones">
-          {chore.zones.map((zone) => (
+          {visibleZones.map((zone) => (
             <ChoreZoneSection
               key={zone.zoneId}
               choreId={chore.id}

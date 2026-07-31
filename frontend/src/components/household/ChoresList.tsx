@@ -1,9 +1,11 @@
-import type { Chore, SettableChoreStatus } from '../../types/chore';
+import type { SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
+import type { FilteredChore } from '../../utils/choreFilter';
 import { ChoreRow } from './ChoreRow';
 
 interface ChoresListProps {
-  chores: Chore[];
+  chores: FilteredChore[];
+  allChoresCount: number;
   zoneNameById: Map<number, string>;
   members: HouseholdMember[];
   currentUserId: number;
@@ -20,6 +22,7 @@ interface ChoresListProps {
 
 export function ChoresList({
   chores,
+  allChoresCount,
   zoneNameById,
   members,
   currentUserId,
@@ -34,15 +37,21 @@ export function ChoresList({
   onRemove,
 }: ChoresListProps) {
   if (chores.length === 0) {
-    return <p className="chores-empty">No chores yet.</p>;
+    return (
+      <p className="chores-empty">
+        {allChoresCount === 0 ? 'No chores yet.' : 'No chores match this filter.'}
+      </p>
+    );
   }
 
   return (
     <ul className="chores-list">
-      {chores.map((chore) => (
+      {chores.map(({ chore, visibleZoneIds, displayStatus }) => (
         <ChoreRow
           key={chore.id}
           chore={chore}
+          visibleZoneIds={visibleZoneIds}
+          displayStatus={displayStatus}
           zoneNameById={zoneNameById}
           members={members}
           currentUserId={currentUserId}
