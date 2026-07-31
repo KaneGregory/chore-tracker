@@ -40,7 +40,7 @@ export function ChoreRow({
   }
 
   return (
-    <li className="chore-card">
+    <li className={`chore-card status-${chore.status}`}>
       <div className="chore-row-main">
         <span className="chore-name">{chore.name}</span>
         <div className="chore-row-actions">

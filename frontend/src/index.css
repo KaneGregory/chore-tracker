@@ -695,6 +695,14 @@ fieldset.form-field legend,
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
+.chore-card.status-complete {
+  background: color-mix(in srgb, var(--accent-2) 26%, var(--card));
+}
+
+.chore-card.status-overdue {
+  background: color-mix(in srgb, var(--error) 26%, var(--card));
+}
+
 .chore-row-main {
   display: flex;
   align-items: center;
@@ -796,6 +804,17 @@ fieldset.form-field legend,
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  background: var(--card);
+}
+
+.chore-zone-section.status-complete {
+  background: color-mix(in srgb, var(--accent-2) 26%, var(--card));
+  border-color: color-mix(in srgb, var(--accent-2) 50%, var(--line));
+}
+
+.chore-zone-section.status-overdue {
+  background: color-mix(in srgb, var(--error) 26%, var(--card));
+  border-color: color-mix(in srgb, var(--error) 50%, var(--line));
 }
 
 .chore-zone-header {

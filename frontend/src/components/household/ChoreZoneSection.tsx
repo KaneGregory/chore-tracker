@@ -42,7 +42,7 @@ export function ChoreZoneSection({
   const isUpdatingStatus = statusUpdatingKey === `${choreId}:${zone.zoneId}`;
 
   return (
-    <li className="chore-zone-section">
+    <li className={`chore-zone-section status-${zone.status}`}>
       <button
         type="button"
         className="chore-zone-header"
