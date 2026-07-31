@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBars } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../../context/AuthContext';
 
 export function UserMenu() {
@@ -43,9 +45,10 @@ export function UserMenu() {
         className="btn btn-pill-outline"
         aria-haspopup="menu"
         aria-expanded={isOpen}
+        aria-label="Menu"
         onClick={() => setIsOpen((prev) => !prev)}
       >
-        Menu
+        <FontAwesomeIcon icon={faBars} />
       </button>
       {isOpen && (
         <div className="user-menu-dropdown" role="menu">

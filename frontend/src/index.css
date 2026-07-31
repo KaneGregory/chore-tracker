@@ -445,13 +445,13 @@ a {
   height: 44px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-2);
   color: var(--accent-ink);
   font-size: 1.6rem;
   font-weight: 700;
   line-height: 1;
   text-decoration: none;
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent-2) 70%, transparent);
   transition:
     transform 120ms ease,
     box-shadow 120ms ease;
@@ -459,7 +459,7 @@ a {
 
 .btn-fab:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 10px 20px -6px color-mix(in srgb, var(--accent-2) 70%, transparent);
 }
 
 /* ---------- household / stamp ---------- */
@@ -530,8 +530,9 @@ a {
   white-space: nowrap;
 }
 
-.role-badge span {
+.role-badge-icon {
   margin-right: 2px;
+  color: rgb(210, 200, 0);
 }
 
 .section-label {
@@ -966,9 +967,9 @@ fieldset.form-field legend,
   height: 20px;
   flex: none;
   border-radius: 50%;
-  border: 2px solid var(--accent);
-  color: var(--accent);
-  background: none;
+  border: none;
+  background: var(--accent-2);
+  color: var(--accent-ink);
   font-size: 0.85rem;
   font-weight: 700;
   line-height: 1;
@@ -977,7 +978,7 @@ fieldset.form-field legend,
 }
 
 .assign-add-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  filter: brightness(1.08);
 }
 
 .assign-add-btn:disabled {

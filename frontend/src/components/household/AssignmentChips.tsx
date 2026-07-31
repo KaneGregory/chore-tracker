@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserPlus } from '@fortawesome/free-solid-svg-icons';
 import type { ChoreAssignment } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 
@@ -95,7 +97,7 @@ export function AssignmentChips({
               onClick={() => setPickerOpen(true)}
               aria-label="Assign someone"
             >
-              +
+              <FontAwesomeIcon icon={faUserPlus} />
             </button>
           ))
         ) : (
@@ -107,7 +109,7 @@ export function AssignmentChips({
               onClick={() => onAssign(choreId, currentUserId, zoneId)}
               aria-label="Assign to me"
             >
-              +
+              <FontAwesomeIcon icon={faUserPlus} />
             </button>
           )
         ))}

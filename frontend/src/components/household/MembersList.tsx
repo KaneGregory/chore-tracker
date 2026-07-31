@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCrown } from '@fortawesome/free-solid-svg-icons';
 import type { HouseholdMember } from '../../types/auth';
 
 interface MembersListProps {
@@ -25,7 +27,8 @@ export function MembersList({
           </span>
           {member.role === 'head' ? (
             <span className="role-badge">
-              <span aria-hidden="true">👑</span> Head of Household
+              <FontAwesomeIcon className="role-badge-icon" icon={faCrown} aria-hidden="true" />{' '}
+              Head of Household
             </span>
           ) : (
             currentUserIsHead && (
