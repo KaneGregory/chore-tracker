@@ -626,16 +626,6 @@ fieldset.form-field legend,
   margin-bottom: 4px;
 }
 
-.type-toggle {
-  display: flex;
-  gap: 8px;
-}
-
-.type-toggle .btn-pill-outline.selected {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .zone-picker {
   border: 2px solid var(--line);
   border-radius: var(--radius-sm);
@@ -747,26 +737,6 @@ fieldset.form-field legend,
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.chore-type-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.chore-type-single-time {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-
-.chore-type-forever {
-  color: var(--accent-2);
-  background: color-mix(in srgb, var(--accent-2) 15%, transparent);
 }
 
 .chore-status-badge {

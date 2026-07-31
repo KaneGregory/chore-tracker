@@ -12,7 +12,6 @@ interface ChoreZoneSectionProps {
   members: HouseholdMember[];
   currentUserId: number;
   isHead: boolean;
-  isAssignable: boolean;
   assigningKey: string | null;
   onAssign: (choreId: number, userId: number, zoneId: number | null) => void;
   unassigningId: number | null;
@@ -29,7 +28,6 @@ export function ChoreZoneSection({
   members,
   currentUserId,
   isHead,
-  isAssignable,
   assigningKey,
   onAssign,
   unassigningId,
@@ -52,7 +50,7 @@ export function ChoreZoneSection({
         <span className="chore-zone-name">{zoneName}</span>
         {!expanded && (
           <span className="chore-zone-summary">
-            {isAssignable && assignments.length > 0 && (
+            {assignments.length > 0 && (
               <AssignmentChips
                 choreId={choreId}
                 zoneId={zone.zoneId}
@@ -81,20 +79,18 @@ export function ChoreZoneSection({
       </button>
       {expanded && (
         <div className="chore-zone-body">
-          {isAssignable && (
-            <AssignmentChips
-              choreId={choreId}
-              zoneId={zone.zoneId}
-              assignments={assignments}
-              members={members}
-              currentUserId={currentUserId}
-              isHead={isHead}
-              assigningKey={assigningKey}
-              onAssign={onAssign}
-              unassigningId={unassigningId}
-              onUnassign={onUnassign}
-            />
-          )}
+          <AssignmentChips
+            choreId={choreId}
+            zoneId={zone.zoneId}
+            assignments={assignments}
+            members={members}
+            currentUserId={currentUserId}
+            isHead={isHead}
+            assigningKey={assigningKey}
+            onAssign={onAssign}
+            unassigningId={unassigningId}
+            onUnassign={onUnassign}
+          />
           <div className="chore-zone-status-row">
             <span className={`chore-status-badge chore-status-${zone.status}`}>
               {CHORE_STATUS_LABEL[zone.status]}

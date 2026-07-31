@@ -37,7 +37,6 @@ export function ChoreRow({
   removingChoreId,
   onRemove,
 }: ChoreRowProps) {
-  const isAssignable = chore.type === 'single-time';
   const hasZones = chore.zones.length > 0;
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const isRemoving = removingChoreId === chore.id;
@@ -61,9 +60,6 @@ export function ChoreRow({
       <div className="chore-row-main">
         <span className="chore-name">{chore.name}</span>
         <div className="chore-row-actions">
-          <span className={`chore-type-badge chore-type-${chore.type}`}>
-            {chore.type === 'forever' ? 'Forever' : 'Single-time'}
-          </span>
           {hasZones ? (
             <span className={`chore-status-badge chore-status-${chore.status}`}>
               {CHORE_STATUS_LABEL[chore.status]}
@@ -75,20 +71,18 @@ export function ChoreRow({
               onToggle={(status) => onSetStatus(chore.id, null, status)}
             />
           )}
-          {isAssignable && (
-            <AssignmentChips
-              choreId={chore.id}
-              zoneId={null}
-              assignments={assignmentsFor(null)}
-              members={members}
-              currentUserId={currentUserId}
-              isHead={isHead}
-              assigningKey={assigningKey}
-              onAssign={onAssign}
-              unassigningId={unassigningId}
-              onUnassign={onUnassign}
-            />
-          )}
+          <AssignmentChips
+            choreId={chore.id}
+            zoneId={null}
+            assignments={assignmentsFor(null)}
+            members={members}
+            currentUserId={currentUserId}
+            isHead={isHead}
+            assigningKey={assigningKey}
+            onAssign={onAssign}
+            unassigningId={unassigningId}
+            onUnassign={onUnassign}
+          />
         </div>
       </div>
       {confirmingRemove && (
@@ -122,7 +116,6 @@ export function ChoreRow({
               members={members}
               currentUserId={currentUserId}
               isHead={isHead}
-              isAssignable={isAssignable}
               assigningKey={assigningKey}
               onAssign={onAssign}
               unassigningId={unassigningId}

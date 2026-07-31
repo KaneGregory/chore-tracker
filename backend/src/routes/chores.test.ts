@@ -93,28 +93,27 @@ describe('POST /api/households/:householdId/chores', () => {
     kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
   });
 
-  it('lets the head create a single-time chore with no zones', async () => {
+  it('lets the head create a chore with no zones', async () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Take out trash', type: 'single-time', zoneIds: [] });
+      .send({ name: 'Take out trash', zoneIds: [] });
 
     expect(response.status).toBe(201);
     expect(response.body.chore).toEqual({
       id: expect.any(Number),
       name: 'Take out trash',
-      type: 'single-time',
       status: 'to-do',
       zones: [],
       assignments: [],
     });
   });
 
-  it('lets the head create a forever chore with no zoneIds field at all', async () => {
+  it('lets the head create a chore with no zoneIds field at all', async () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Water the plants', type: 'forever' });
+      .send({ name: 'Water the plants' });
 
     expect(response.status).toBe(201);
     expect(response.body.chore.zones).toEqual([]);
@@ -124,7 +123,7 @@ describe('POST /api/households/:householdId/chores', () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Wash dishes', type: 'forever', zoneIds: [kitchenZoneId] });
+      .send({ name: 'Wash dishes', zoneIds: [kitchenZoneId] });
 
     expect(response.status).toBe(201);
     expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'to-do' }]);
@@ -136,7 +135,7 @@ describe('POST /api/households/:householdId/chores', () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Deep clean', type: 'single-time', zoneIds: [kitchenZoneId, bathroomZoneId] });
+      .send({ name: 'Deep clean', zoneIds: [kitchenZoneId, bathroomZoneId] });
 
     expect(response.status).toBe(201);
     const zoneIds = (response.body.chore.zones as { zoneId: number }[])
@@ -149,7 +148,7 @@ describe('POST /api/households/:householdId/chores', () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Sweep floor', type: 'forever', zoneIds: [kitchenZoneId, kitchenZoneId] });
+      .send({ name: 'Sweep floor', zoneIds: [kitchenZoneId, kitchenZoneId] });
 
     expect(response.status).toBe(201);
     expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'to-do' }]);
@@ -159,7 +158,7 @@ describe('POST /api/households/:householdId/chores', () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', member.cookie)
-      .send({ name: 'Mow the lawn', type: 'forever', zoneIds: [] });
+      .send({ name: 'Mow the lawn', zoneIds: [] });
 
     expect(response.status).toBe(403);
     expect(response.body.error).toBe('NotHeadOfHousehold');
@@ -171,7 +170,7 @@ describe('POST /api/households/:householdId/chores', () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', outsider.cookie)
-      .send({ name: 'Not allowed', type: 'forever', zoneIds: [] });
+      .send({ name: 'Not allowed', zoneIds: [] });
 
     expect(response.status).toBe(404);
     expect(response.body.error).toBe('HouseholdNotFound');
@@ -184,27 +183,17 @@ describe('POST /api/households/:householdId/chores', () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Cross household', type: 'forever', zoneIds: [otherRootId] });
+      .send({ name: 'Cross household', zoneIds: [otherRootId] });
 
     expect(response.status).toBe(404);
     expect(response.body.error).toBe('ZoneNotFound');
-  });
-
-  it('rejects an invalid chore type with 400', async () => {
-    const response = await request(app)
-      .post(`/api/households/${head.householdId}/chores`)
-      .set('Cookie', head.cookie)
-      .send({ name: 'Bad type', type: 'weekly', zoneIds: [] });
-
-    expect(response.status).toBe(400);
-    expect(response.body.error).toBe('ValidationError');
   });
 
   it('rejects an empty chore name with 400', async () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: '   ', type: 'forever', zoneIds: [] });
+      .send({ name: '   ', zoneIds: [] });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('ValidationError');
@@ -213,7 +202,7 @@ describe('POST /api/households/:householdId/chores', () => {
   it('rejects an unauthenticated request with 401', async () => {
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
-      .send({ name: 'Nope', type: 'forever', zoneIds: [] });
+      .send({ name: 'Nope', zoneIds: [] });
 
     expect(response.status).toBe(401);
   });
@@ -228,7 +217,7 @@ describe('GET /api/households/:householdId/chores', () => {
     await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
-      .send({ name: 'Vacuum', type: 'forever', zoneIds: [rootZoneId] });
+      .send({ name: 'Vacuum', zoneIds: [rootZoneId] });
 
     const response = await request(app)
       .get(`/api/households/${head.householdId}/chores`)
@@ -239,7 +228,6 @@ describe('GET /api/households/:householdId/chores', () => {
       {
         id: expect.any(Number),
         name: 'Vacuum',
-        type: 'forever',
         status: 'to-do',
         zones: [{ zoneId: rootZoneId, status: 'to-do' }],
         assignments: [],
@@ -287,8 +275,8 @@ describe('DELETE /api/households/:householdId/chores/:choreId', () => {
   }
 
   it('lets the head remove a chore', async () => {
-    const keep = await postChore({ name: 'Keep me', type: 'single-time', zoneIds: [] });
-    const remove = await postChore({ name: 'Remove me', type: 'single-time', zoneIds: [] });
+    const keep = await postChore({ name: 'Keep me', zoneIds: [] });
+    const remove = await postChore({ name: 'Remove me', zoneIds: [] });
 
     const response = await request(app)
       .delete(`/api/households/${head.householdId}/chores/${remove.id}`)
@@ -303,7 +291,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId', () => {
   it('also removes the chore’s assignments and zone links', async () => {
     const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
     const zoneId = await createZone(head.householdId, head.cookie, 'Cascade Zone', rootZoneId);
-    const chore = await postChore({ name: 'Cascade chore', type: 'single-time', zoneIds: [zoneId] });
+    const chore = await postChore({ name: 'Cascade chore', zoneIds: [zoneId] });
     const meResponse = await request(app).get('/api/auth/me').set('Cookie', member.cookie);
     const memberId = meResponse.body.user.id;
     await request(app)
@@ -321,7 +309,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId', () => {
   });
 
   it('rejects a non-head member with 403', async () => {
-    const chore = await postChore({ name: 'Not yours', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Not yours', zoneIds: [] });
 
     const response = await request(app)
       .delete(`/api/households/${head.householdId}/chores/${chore.id}`)
@@ -341,7 +329,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId', () => {
   });
 
   it('rejects a non-member of the household with a generic 404', async () => {
-    const chore = await postChore({ name: 'Outsider target', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Outsider target', zoneIds: [] });
     const outsider = await registerHeadOfHousehold('remove-outsider@example.com', 'Outsider House');
 
     const response = await request(app)
@@ -353,7 +341,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId', () => {
   });
 
   it('rejects an unauthenticated request with 401', async () => {
-    const chore = await postChore({ name: 'No cookie', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'No cookie', zoneIds: [] });
 
     const response = await request(app).delete(`/api/households/${head.householdId}/chores/${chore.id}`);
 
@@ -392,8 +380,8 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
     return response.body.chore;
   }
 
-  it('lets a member assign a single-time chore to themself', async () => {
-    const chore = await postChore({ name: 'Vacuum', type: 'single-time', zoneIds: [] });
+  it('lets a member assign a chore to themself', async () => {
+    const chore = await postChore({ name: 'Vacuum', zoneIds: [] });
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -411,8 +399,8 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
     ]);
   });
 
-  it('lets a member assign a single-time chore scoped to one of its zones', async () => {
-    const chore = await postChore({ name: 'Wash dishes', type: 'single-time', zoneIds: [kitchenZoneId] });
+  it('lets a member assign a chore scoped to one of its zones', async () => {
+    const chore = await postChore({ name: 'Wash dishes', zoneIds: [kitchenZoneId] });
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -431,7 +419,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('rejects a member assigning a chore to someone else with 403', async () => {
-    const chore = await postChore({ name: 'Take out trash', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Take out trash', zoneIds: [] });
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -442,8 +430,8 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
     expect(response.body.error).toBe('CannotAssignOthers');
   });
 
-  it('lets the head assign a single-time chore to any member', async () => {
-    const chore = await postChore({ name: 'Mop floor', type: 'single-time', zoneIds: [] });
+  it('lets the head assign a chore to any member', async () => {
+    const chore = await postChore({ name: 'Mop floor', zoneIds: [] });
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -456,20 +444,8 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
     );
   });
 
-  it('rejects assigning a forever chore with 400', async () => {
-    const chore = await postChore({ name: 'Water plants', type: 'forever', zoneIds: [] });
-
-    const response = await request(app)
-      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
-      .set('Cookie', head.cookie)
-      .send({ userId: memberId });
-
-    expect(response.status).toBe(400);
-    expect(response.body.error).toBe('ChoreNotAssignable');
-  });
-
   it('rejects a zone that is not one of the chore’s zones with 400', async () => {
-    const chore = await postChore({ name: 'Sweep', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Sweep', zoneIds: [] });
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -481,7 +457,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('lets multiple different members be assigned to the same chore/zone target', async () => {
-    const chore = await postChore({ name: 'Fold laundry', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Fold laundry', zoneIds: [] });
 
     await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -500,7 +476,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('rejects assigning the same person to the same chore/zone target twice with 409', async () => {
-    const chore = await postChore({ name: 'Scrub tub', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Scrub tub', zoneIds: [] });
 
     await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -517,7 +493,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('rejects assigning to a userId that is not a member of the household with 404', async () => {
-    const chore = await postChore({ name: 'Clean windows', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Clean windows', zoneIds: [] });
     const outsider = await registerHeadOfHousehold('assign-outsider@example.com', 'Outsider House');
     const outsiderId = await meId(outsider.cookie);
 
@@ -541,7 +517,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('rejects a non-member of the household with a generic 404', async () => {
-    const chore = await postChore({ name: 'Dust shelves', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Dust shelves', zoneIds: [] });
     const outsider = await registerHeadOfHousehold('assign-outsider-2@example.com', 'Outsider House 2');
     const outsiderId = await meId(outsider.cookie);
 
@@ -555,7 +531,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('rejects an unauthenticated request with 401', async () => {
-    const chore = await postChore({ name: 'Take out recycling', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Take out recycling', zoneIds: [] });
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -565,7 +541,7 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
   });
 
   it('reflects created assignments when listing chores', async () => {
-    const chore = await postChore({ name: 'Empty dishwasher', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Empty dishwasher', zoneIds: [] });
 
     await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -630,7 +606,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   }
 
   it('lets a member unassign their own whole-chore assignment', async () => {
-    const chore = await postChore({ name: 'Vacuum', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Vacuum', zoneIds: [] });
     const assigned = await assign(chore.id, head.cookie, { userId: memberId });
     const assignmentId = assigned.assignments[0].id;
 
@@ -643,7 +619,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('lets a member unassign their own zone-scoped assignment', async () => {
-    const chore = await postChore({ name: 'Wash dishes', type: 'single-time', zoneIds: [kitchenZoneId] });
+    const chore = await postChore({ name: 'Wash dishes', zoneIds: [kitchenZoneId] });
     const assigned = await assign(chore.id, head.cookie, { userId: memberId, zoneId: kitchenZoneId });
     const assignmentId = assigned.assignments[0].id;
 
@@ -656,7 +632,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('lets the head unassign someone else', async () => {
-    const chore = await postChore({ name: 'Mop floor', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Mop floor', zoneIds: [] });
     const assigned = await assign(chore.id, head.cookie, { userId: memberId });
     const assignmentId = assigned.assignments[0].id;
 
@@ -669,7 +645,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('rejects a member unassigning someone else with 403', async () => {
-    const chore = await postChore({ name: 'Take out trash', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Take out trash', zoneIds: [] });
     const assigned = await assign(chore.id, head.cookie, { userId: otherMemberId });
     const assignmentId = assigned.assignments[0].id;
 
@@ -690,7 +666,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('rejects a non-existent assignment id with 404', async () => {
-    const chore = await postChore({ name: 'Clean windows', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Clean windows', zoneIds: [] });
 
     const response = await request(app)
       .delete(`/api/households/${head.householdId}/chores/${chore.id}/assignments/999999`)
@@ -701,8 +677,8 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('rejects an assignment id that belongs to a different chore with 404', async () => {
-    const choreA = await postChore({ name: 'Dust shelves', type: 'single-time', zoneIds: [] });
-    const choreB = await postChore({ name: 'Sweep porch', type: 'single-time', zoneIds: [] });
+    const choreA = await postChore({ name: 'Dust shelves', zoneIds: [] });
+    const choreB = await postChore({ name: 'Sweep porch', zoneIds: [] });
     const assignedA = await assign(choreA.id, head.cookie, { userId: memberId });
     const assignmentId = assignedA.assignments[0].id;
 
@@ -724,7 +700,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('rejects a non-member of the household with a generic 404', async () => {
-    const chore = await postChore({ name: 'Water plants', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Water plants', zoneIds: [] });
     const assigned = await assign(chore.id, head.cookie, { userId: memberId });
     const assignmentId = assigned.assignments[0].id;
     const outsider = await registerHeadOfHousehold('unassign-outsider@example.com', 'Outsider House');
@@ -738,7 +714,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('rejects an unauthenticated request with 401', async () => {
-    const chore = await postChore({ name: 'Feed the cat', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Feed the cat', zoneIds: [] });
     const assigned = await assign(chore.id, head.cookie, { userId: memberId });
     const assignmentId = assigned.assignments[0].id;
 
@@ -750,7 +726,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
   });
 
   it('allows re-assigning the same target after unassigning it', async () => {
-    const chore = await postChore({ name: 'Iron shirts', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Iron shirts', zoneIds: [] });
     const assigned = await assign(chore.id, head.cookie, { userId: memberId });
     const assignmentId = assigned.assignments[0].id;
 
@@ -789,7 +765,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
   }
 
   it('lets a member mark a zoneless chore complete, and back to to-do', async () => {
-    const chore = await postChore({ name: 'Vacuum', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Vacuum', zoneIds: [] });
 
     const completed = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
@@ -811,7 +787,6 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
   it('rejects setting status on a chore that has zones with 400', async () => {
     const chore = await postChore({
       name: 'Wash dishes',
-      type: 'single-time',
       zoneIds: [kitchenZoneId],
     });
 
@@ -825,7 +800,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
   });
 
   it('rejects an invalid status value with 400', async () => {
-    const chore = await postChore({ name: 'Mop floor', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Mop floor', zoneIds: [] });
 
     const response = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
@@ -847,7 +822,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
   });
 
   it('rejects a non-member of the household with a generic 404', async () => {
-    const chore = await postChore({ name: 'Dust shelves', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Dust shelves', zoneIds: [] });
     const outsider = await registerHeadOfHousehold('status-outsider@example.com', 'Outsider House');
 
     const response = await request(app)
@@ -860,7 +835,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
   });
 
   it('rejects an unauthenticated request with 401', async () => {
-    const chore = await postChore({ name: 'Feed the cat', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Feed the cat', zoneIds: [] });
 
     const response = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
@@ -895,7 +870,6 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
   it('lets a member mark one of a chore’s zones complete', async () => {
     const chore = await postChore({
       name: 'Wash dishes',
-      type: 'single-time',
       zoneIds: [kitchenZoneId],
     });
 
@@ -912,7 +886,6 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
   it('keeps the chore at to-do until every zone is complete', async () => {
     const chore = await postChore({
       name: 'Deep clean',
-      type: 'single-time',
       zoneIds: [kitchenZoneId, bathroomZoneId],
     });
 
@@ -930,7 +903,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
   });
 
   it('rejects a zone that is not one of the chore’s zones with 400', async () => {
-    const chore = await postChore({ name: 'Sweep', type: 'single-time', zoneIds: [] });
+    const chore = await postChore({ name: 'Sweep', zoneIds: [] });
 
     const response = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
@@ -954,7 +927,6 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
   it('rejects a non-member of the household with a generic 404', async () => {
     const chore = await postChore({
       name: 'Water plants',
-      type: 'single-time',
       zoneIds: [kitchenZoneId],
     });
     const outsider = await registerHeadOfHousehold(
@@ -974,7 +946,6 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
   it('rejects an unauthenticated request with 401', async () => {
     const chore = await postChore({
       name: 'Take out recycling',
-      type: 'single-time',
       zoneIds: [kitchenZoneId],
     });
 

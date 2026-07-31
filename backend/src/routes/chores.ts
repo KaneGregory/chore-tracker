@@ -53,7 +53,6 @@ choresRouter.post('/:householdId/chores', (req, res, next) => {
       paramsParsed.data.householdId,
       req.user.id,
       bodyParsed.data.name,
-      bodyParsed.data.type,
       bodyParsed.data.zoneIds,
     );
     res.status(201).json({ chore });

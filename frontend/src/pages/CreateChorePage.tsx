@@ -7,7 +7,6 @@ import * as zoneApi from '../api/zoneApi';
 import * as choreApi from '../api/choreApi';
 import { ApiError } from '../api/httpClient';
 import type { Zone } from '../types/zone';
-import type { ChoreType } from '../types/chore';
 
 export function CreateChorePage() {
   const { householdId: householdIdParam } = useParams();
@@ -43,11 +42,11 @@ export function CreateChorePage() {
     };
   }, [householdId, household]);
 
-  async function handleSubmit(name: string, type: ChoreType, zoneIds: number[]) {
+  async function handleSubmit(name: string, zoneIds: number[]) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await choreApi.createChore(householdId, name, type, zoneIds);
+      await choreApi.createChore(householdId, name, zoneIds);
       navigate('/');
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : 'Could not create that chore.');
@@ -69,7 +68,7 @@ export function CreateChorePage() {
         <CreateChoreForm
           zoneTree={zoneTree}
           submitting={submitting}
-          onSubmit={(name, type, zoneIds) => void handleSubmit(name, type, zoneIds)}
+          onSubmit={(name, zoneIds) => void handleSubmit(name, zoneIds)}
         />
       ) : (
         !loadError && <p className="members-loading">Loading…</p>

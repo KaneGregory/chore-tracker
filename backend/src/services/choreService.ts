@@ -1,13 +1,12 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { choreAssignments, chores, choreZones, users, zones } from '../db/schema.js';
-import type { ChoreStatus, ChoreType } from '../db/schema.js';
+import type { ChoreStatus } from '../db/schema.js';
 import {
   CannotAssignOthersError,
   CannotUnassignOthersError,
   ChoreAlreadyAssignedError,
   ChoreAssignmentNotFoundError,
-  ChoreNotAssignableError,
   ChoreNotFoundError,
   ChoreStatusManagedByZonesError,
   ChoreZoneMismatchError,
@@ -31,18 +30,16 @@ export interface ChoreZoneStatus {
 export interface ChoreSummary {
   id: number;
   name: string;
-  type: ChoreType;
   status: ChoreStatus;
   zones: ChoreZoneStatus[];
   assignments: ChoreAssignmentSummary[];
 }
 
-type ChoreRow = { id: number; name: string; type: ChoreType; status: ChoreStatus };
+type ChoreRow = { id: number; name: string; status: ChoreStatus };
 
 const CHORE_ROW_COLUMNS = {
   id: chores.id,
   name: chores.name,
-  type: chores.type,
   status: chores.status,
 };
 
@@ -109,7 +106,6 @@ function attachDetails(choreRows: ChoreRow[]): ChoreSummary[] {
     return {
       id: row.id,
       name: row.name,
-      type: row.type,
       status: deriveChoreStatus(
         row.status,
         zones.map((zone) => zone.status),
@@ -141,7 +137,6 @@ export function createChore(
   householdId: number,
   requestingUserId: number,
   name: string,
-  type: ChoreType,
   zoneIds: number[],
 ): ChoreSummary {
   requireHeadMembership(householdId, requestingUserId);
@@ -160,7 +155,7 @@ export function createChore(
   const chore = db.transaction((tx) => {
     const inserted = tx
       .insert(chores)
-      .values({ householdId, name, type, createdAt: now })
+      .values({ householdId, name, createdAt: now })
       .returning()
       .get();
 
@@ -209,7 +204,6 @@ export function assignChore(
 
   const chore = findChoreInHousehold(householdId, choreId);
   if (!chore) throw new ChoreNotFoundError();
-  if (chore.type !== 'single-time') throw new ChoreNotAssignableError();
 
   if (assigneeUserId !== requestingUserId && !getMembership(householdId, assigneeUserId)) {
     throw new MemberNotFoundError();

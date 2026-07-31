@@ -90,12 +90,6 @@ export class ChoreNotFoundError extends AppError {
   }
 }
 
-export class ChoreNotAssignableError extends AppError {
-  constructor() {
-    super(400, 'ChoreNotAssignable', 'Only single-time chores can be assigned right now');
-  }
-}
-
 export class ChoreZoneMismatchError extends AppError {
   constructor() {
     super(400, 'ChoreZoneMismatch', 'That zone is not one of this chore’s zones');
