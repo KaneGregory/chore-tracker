@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ChoreAssignment, ChoreZoneStatus, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
+import { ChoreStatusActions } from './ChoreStatusActions';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreZoneSectionProps {
@@ -36,7 +37,6 @@ export function ChoreZoneSection({
   onSetStatus,
 }: ChoreZoneSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  const isComplete = zone.status === 'complete';
   const isUpdatingStatus = statusUpdatingKey === `${choreId}:${zone.zoneId}`;
 
   return (
@@ -98,14 +98,12 @@ export function ChoreZoneSection({
             unassigningId={unassigningId}
             onUnassign={onUnassign}
           />
-          <button
-            type="button"
-            className="btn btn-pill-outline"
+          <ChoreStatusActions
+            status={zone.status}
+            isHead={isHead}
             disabled={isUpdatingStatus}
-            onClick={() => onSetStatus(choreId, zone.zoneId, isComplete ? 'to-do' : 'complete')}
-          >
-            {isUpdatingStatus ? 'Updating…' : isComplete ? 'Mark as to-do' : 'Mark complete'}
-          </button>
+            onSetStatus={(status) => onSetStatus(choreId, zone.zoneId, status)}
+          />
         </div>
       )}
     </li>

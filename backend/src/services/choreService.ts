@@ -11,6 +11,7 @@ import {
   ChoreStatusManagedByZonesError,
   ChoreZoneMismatchError,
   MemberNotFoundError,
+  NotHeadOfHouseholdError,
   ZoneNotFoundError,
 } from '../errors.js';
 import { getMembership, requireHeadMembership, requireMembership } from './membershipAuth.js';
@@ -283,9 +284,10 @@ export function setChoreStatus(
   householdId: number,
   choreId: number,
   requestingUserId: number,
-  status: 'to-do' | 'complete',
+  status: ChoreStatus,
 ): ChoreSummary {
-  requireMembership(householdId, requestingUserId);
+  const role = requireMembership(householdId, requestingUserId);
+  if (status === 'overdue' && role !== 'head') throw new NotHeadOfHouseholdError();
 
   const chore = findChoreInHousehold(householdId, choreId);
   if (!chore) throw new ChoreNotFoundError();
@@ -307,9 +309,10 @@ export function setChoreZoneStatus(
   choreId: number,
   zoneId: number,
   requestingUserId: number,
-  status: 'to-do' | 'complete',
+  status: ChoreStatus,
 ): ChoreSummary {
-  requireMembership(householdId, requestingUserId);
+  const role = requireMembership(householdId, requestingUserId);
+  if (status === 'overdue' && role !== 'head') throw new NotHeadOfHouseholdError();
 
   const chore = findChoreInHousehold(householdId, choreId);
   if (!chore) throw new ChoreNotFoundError();

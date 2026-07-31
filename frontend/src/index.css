@@ -753,8 +753,22 @@ fieldset.form-field legend,
   margin-top: 8px;
 }
 
-.chore-status-btn {
+.chore-status-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chore-status-row {
   margin-top: 10px;
+}
+
+.chore-card.status-complete .chore-status-actions .btn-pill-outline {
+  border-color: color-mix(in srgb, var(--accent-2) 50%, var(--line));
+}
+
+.chore-card.status-overdue .chore-status-actions .btn-pill-outline {
+  border-color: color-mix(in srgb, var(--error) 50%, var(--line));
 }
 
 .chore-status-badge {
@@ -853,6 +867,22 @@ fieldset.form-field legend,
   gap: 10px;
   padding: 4px 10px 10px;
   border-top: 1px solid var(--line);
+}
+
+.chore-zone-section.status-complete .chore-zone-body {
+  border-top-color: color-mix(in srgb, var(--accent-2) 50%, var(--line));
+}
+
+.chore-zone-section.status-overdue .chore-zone-body {
+  border-top-color: color-mix(in srgb, var(--error) 50%, var(--line));
+}
+
+.chore-zone-section.status-complete .btn-pill-outline {
+  border-color: color-mix(in srgb, var(--accent-2) 50%, var(--line));
+}
+
+.chore-zone-section.status-overdue .btn-pill-outline {
+  border-color: color-mix(in srgb, var(--error) 50%, var(--line));
 }
 
 .status-dot {

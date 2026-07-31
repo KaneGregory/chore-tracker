@@ -48,8 +48,9 @@ export const zones = sqliteTable('zones', {
   createdAt: integer('created_at').notNull(),
 });
 
-// 'overdue' isn't computed or settable yet — the column exists now so the future
-// due-date/scheduling work that produces it doesn't need another migration.
+// 'overdue' is set manually by a Head of Household for now (see choreService) — it
+// isn't yet computed automatically from due dates, but the column already supports
+// that future behavior without another migration.
 export const CHORE_STATUSES = ['to-do', 'complete', 'overdue'] as const;
 export type ChoreStatus = (typeof CHORE_STATUSES)[number];
 

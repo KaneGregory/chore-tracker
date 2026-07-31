@@ -805,10 +805,50 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
     const response = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
       .set('Cookie', head.cookie)
-      .send({ status: 'overdue' });
+      .send({ status: 'archived' });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('lets a head mark a zoneless chore overdue', async () => {
+    const chore = await postChore({ name: 'Scrub tub', zoneIds: [] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.status).toBe('overdue');
+  });
+
+  it('rejects a member marking a chore overdue with 403', async () => {
+    const chore = await postChore({ name: 'Empty dishwasher', zoneIds: [] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('lets a member mark an overdue chore complete', async () => {
+    const chore = await postChore({ name: 'Wipe counters', zoneIds: [] });
+    await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.status).toBe('complete');
   });
 
   it('rejects a non-existent chore id with 404', async () => {
@@ -912,6 +952,46 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('ChoreZoneMismatch');
+  });
+
+  it('lets a head mark a chore’s zone overdue', async () => {
+    const chore = await postChore({ name: 'Scrub grout', zoneIds: [kitchenZoneId] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'overdue' }]);
+  });
+
+  it('rejects a member marking a chore’s zone overdue with 403', async () => {
+    const chore = await postChore({ name: 'Polish taps', zoneIds: [kitchenZoneId] });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('lets a member mark an overdue zone complete', async () => {
+    const chore = await postChore({ name: 'Restock soap', zoneIds: [kitchenZoneId] });
+    await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'complete' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'complete' }]);
   });
 
   it('rejects a non-existent chore id with 404', async () => {

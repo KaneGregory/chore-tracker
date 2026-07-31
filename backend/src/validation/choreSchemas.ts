@@ -31,8 +31,9 @@ export const assignmentParamsSchema = z.object({
   assignmentId: idParam,
 });
 
-// 'overdue' isn't user-settable yet — it'll be computed once due dates exist.
-export const settableChoreStatusSchema = z.enum(['to-do', 'complete']);
+// 'overdue' is manually settable (Head of Household only, enforced in choreService)
+// rather than computed — automatic overdue computation from due dates doesn't exist yet.
+export const settableChoreStatusSchema = z.enum(['to-do', 'complete', 'overdue']);
 
 export const setChoreStatusSchema = z.object({
   status: settableChoreStatusSchema,

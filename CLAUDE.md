@@ -105,18 +105,23 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   views, Head of Household creates), authorized via the same `membershipAuth.ts`
   helpers.
 * Chores (and, separately, each chore-zone link) have a `status`:
-  `'to-do' | 'complete' | 'overdue'`. Only `'to-do'` and `'complete'` are settable via
-  the API right now — `'overdue'` exists in the column/type today so the future
-  due-date work that computes it doesn't need another migration, but nothing sets it
-  yet. A chore with zones takes its status from them, not its own `status` column:
-  it's always the lowest-ranked status among its zones (`overdue` < `to-do` <
-  `complete`), computed on read in `choreService.deriveChoreStatus` — PATCHing a
-  zoned chore's own `/status` endpoint is rejected (`ChoreStatusManagedByZones`);
-  only its zones (`/chores/:choreId/zones/:zoneId/status`) can be marked. Marking
-  complete is authorized as "any household member," not Head-of-Household-only —
-  unlike creating a chore, this was a judgment call (completing a chore reads as a
-  routine cooperative action, not an admin one) rather than something explicitly
-  specified, so revisit it if that's wrong.
+  `'to-do' | 'complete' | 'overdue'`. All three are settable via the API, but
+  `'overdue'` is Head-of-Household only (enforced in `choreService.setChoreStatus` /
+  `setChoreZoneStatus`, not the route or a schema refinement) — it's a manual flag for
+  now, not yet computed automatically from due dates. Setting `'to-do'` or
+  `'complete'` remains "any household member," including completing a chore that's
+  currently overdue. A chore with zones takes its status from them, not its own
+  `status` column: it's always the lowest-ranked status among its zones (`overdue` <
+  `to-do` < `complete`), computed on read in `choreService.deriveChoreStatus` —
+  PATCHing a zoned chore's own `/status` endpoint is rejected
+  (`ChoreStatusManagedByZones`); only its zones (`/chores/:choreId/zones/:zoneId/status`)
+  can be marked. Marking complete is authorized as "any household member," not
+  Head-of-Household-only — unlike creating a chore, this was a judgment call
+  (completing a chore reads as a routine cooperative action, not an admin one) rather
+  than something explicitly specified, so revisit it if that's wrong. The frontend's
+  `ChoreStatusActions` component (`frontend/src/components/household/`) is the single
+  place that decides which status buttons render for a given status/role — reuse it
+  rather than duplicating the to-do/complete/overdue button logic elsewhere.
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
   for installability (manifest + service worker).
@@ -191,12 +196,13 @@ Run from within `backend/` or `frontend/` unless noted:
   "are you sure" confirmation guards this in the UI, but there's no soft-delete or
   recovery if someone confirms by mistake.
 * Chores can be created, removed, assigned/unassigned (many-to-many, any chore), and
-  marked to-do/complete, but not edited yet. Removal is Head of Household only (same
-  split as create), guarded by an inline "are you sure" confirmation in the UI (same
-  pattern as zone removal) rather than a soft-delete — no undo if confirmed by
+  marked to-do/complete/overdue, but not edited yet. Removal is Head of Household only
+  (same split as create), guarded by an inline "are you sure" confirmation in the UI
+  (same pattern as zone removal) rather than a soft-delete — no undo if confirmed by
   mistake. There's no chore detail view either, just the flat list on the home page;
-  anything richer (filtering by zone, editing) is future work along with `'overdue'`
-  status computation once due dates exist.
+  anything richer (filtering by zone, editing) is future work, along with computing
+  `'overdue'` automatically from due dates once those exist (it's manually
+  head-settable in the meantime — see the chores bullet in Architectural decisions).
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a

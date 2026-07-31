@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Chore, ChoreStatus, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
+import { ChoreStatusActions } from './ChoreStatusActions';
 import { ChoreZoneSection } from './ChoreZoneSection';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
@@ -46,7 +47,6 @@ export function ChoreRow({
     : chore.zones;
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const isRemoving = removingChoreId === chore.id;
-  const isComplete = displayStatus === 'complete';
   const isUpdatingStatus = statusUpdatingKey === `${chore.id}:none`;
 
   function assignmentsFor(zoneId: number | null) {
@@ -105,14 +105,13 @@ export function ChoreRow({
         />
       </div>
       {!hasZones && (
-        <button
-          type="button"
-          className="btn btn-pill-outline chore-status-btn"
+        <ChoreStatusActions
+          status={displayStatus}
+          isHead={isHead}
           disabled={isUpdatingStatus}
-          onClick={() => onSetStatus(chore.id, null, isComplete ? 'to-do' : 'complete')}
-        >
-          {isUpdatingStatus ? 'Updating…' : isComplete ? 'Mark as to-do' : 'Mark complete'}
-        </button>
+          onSetStatus={(status) => onSetStatus(chore.id, null, status)}
+          className="chore-status-row"
+        />
       )}
       {hasZones && (
         <ul className="chore-zones">

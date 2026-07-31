@@ -1,6 +1,6 @@
-// 'overdue' isn't settable yet — it'll be computed once due dates exist.
 export type ChoreStatus = 'to-do' | 'complete' | 'overdue';
-export type SettableChoreStatus = 'to-do' | 'complete';
+// 'overdue' is settable only by a Head of Household — enforced server-side, not here.
+export type SettableChoreStatus = 'to-do' | 'complete' | 'overdue';
 
 export interface ChoreAssignment {
   id: number;
