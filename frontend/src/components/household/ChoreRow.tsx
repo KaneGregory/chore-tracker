@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Chore, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
@@ -17,6 +18,8 @@ interface ChoreRowProps {
   onUnassign: (choreId: number, assignmentId: number) => void;
   statusUpdatingKey: string | null;
   onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
+  removingChoreId: number | null;
+  onRemove: (choreId: number) => void;
 }
 
 export function ChoreRow({
@@ -31,9 +34,13 @@ export function ChoreRow({
   onUnassign,
   statusUpdatingKey,
   onSetStatus,
+  removingChoreId,
+  onRemove,
 }: ChoreRowProps) {
   const isAssignable = chore.type === 'single-time';
   const hasZones = chore.zones.length > 0;
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const isRemoving = removingChoreId === chore.id;
 
   function assignmentsFor(zoneId: number | null) {
     return chore.assignments.filter((assignment) => assignment.zoneId === zoneId);
@@ -41,6 +48,16 @@ export function ChoreRow({
 
   return (
     <li className={`chore-card status-${chore.status}`}>
+      {isHead && !confirmingRemove && (
+        <button
+          type="button"
+          className="chore-remove-btn"
+          onClick={() => setConfirmingRemove(true)}
+          aria-label={`Remove ${chore.name}`}
+        >
+          ×
+        </button>
+      )}
       <div className="chore-row-main">
         <span className="chore-name">{chore.name}</span>
         <div className="chore-row-actions">
@@ -74,6 +91,25 @@ export function ChoreRow({
           )}
         </div>
       </div>
+      {confirmingRemove && (
+        <div className="zone-inline-form">
+          <span>Remove this chore?</span>
+          <button
+            type="button"
+            className="btn btn-pill-outline"
+            disabled={isRemoving}
+            onClick={() => {
+              onRemove(chore.id);
+              setConfirmingRemove(false);
+            }}
+          >
+            {isRemoving ? 'Removing…' : 'Yes, remove'}
+          </button>
+          <button type="button" className="btn btn-text" onClick={() => setConfirmingRemove(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
       {hasZones && (
         <ul className="chore-zones">
           {chore.zones.map((zone) => (

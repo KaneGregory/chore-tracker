@@ -62,6 +62,27 @@ choresRouter.post('/:householdId/chores', (req, res, next) => {
   }
 });
 
+choresRouter.delete('/:householdId/chores/:choreId', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = choreParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid household or chore id', paramsParsed.error.issues));
+    return;
+  }
+
+  try {
+    const chores = choreService.removeChore(
+      paramsParsed.data.householdId,
+      req.user.id,
+      paramsParsed.data.choreId,
+    );
+    res.status(200).json({ chores });
+  } catch (err) {
+    next(err);
+  }
+});
+
 choresRouter.post('/:householdId/chores/:choreId/assignments', (req, res, next) => {
   if (!req.user) throw new NotAuthenticatedError();
 

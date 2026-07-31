@@ -189,14 +189,16 @@ Run from within `backend/` or `frontend/` unless noted:
 * Removing a zone cascades to everything nested inside it, with no undo — an inline
   "are you sure" confirmation guards this in the UI, but there's no soft-delete or
   recovery if someone confirms by mistake.
-* Chores can be created, assigned/unassigned, and marked to-do/complete, but not
-  edited or removed yet. Assignment (many-to-many) is single-time chores only for
-  now — forever chores need their own not-yet-decided assignment rules — but
-  completion applies to both types equally, per what was actually asked. There's no
-  chore detail view either, just the flat list on the home page; anything richer
-  (filtering by zone, editing) is future work along with how the two chore types
-  actually differ day-to-day, and along with `'overdue'` status computation once due
-  dates exist.
+* Chores can be created, removed, assigned/unassigned, and marked to-do/complete, but
+  not edited yet. Removal is Head of Household only (same split as create), guarded
+  by an inline "are you sure" confirmation in the UI (same pattern as zone removal)
+  rather than a soft-delete — no undo if confirmed by mistake. Assignment
+  (many-to-many) is single-time chores only for now — forever chores need their own
+  not-yet-decided assignment rules — but completion and removal apply to both types
+  equally, per what was actually asked. There's no chore detail view either, just the
+  flat list on the home page; anything richer (filtering by zone, editing) is future
+  work along with how the two chore types actually differ day-to-day, and along with
+  `'overdue'` status computation once due dates exist.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a

@@ -23,6 +23,14 @@ export async function createChore(
   return response.chore;
 }
 
+export async function removeChore(householdId: number, choreId: number): Promise<Chore[]> {
+  const response = await apiRequest<ChoresResponse>(
+    `/api/households/${householdId}/chores/${choreId}`,
+    { method: 'DELETE' },
+  );
+  return response.chores;
+}
+
 export async function assignChore(
   householdId: number,
   choreId: number,

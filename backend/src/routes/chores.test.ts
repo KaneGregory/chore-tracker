@@ -269,6 +269,98 @@ describe('GET /api/households/:householdId/chores', () => {
   });
 });
 
+describe('DELETE /api/households/:householdId/chores/:choreId', () => {
+  let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
+  let member: Awaited<ReturnType<typeof registerAndJoin>>;
+
+  beforeAll(async () => {
+    head = await registerHeadOfHousehold('remove-hoh@example.com', 'Remove House');
+    member = await registerAndJoin('remove-member@example.com', head.joinCode);
+  });
+
+  async function postChore(body: Record<string, unknown>) {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send(body);
+    return response.body.chore;
+  }
+
+  it('lets the head remove a chore', async () => {
+    const keep = await postChore({ name: 'Keep me', type: 'single-time', zoneIds: [] });
+    const remove = await postChore({ name: 'Remove me', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${remove.id}`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(200);
+    const ids = (response.body.chores as { id: number }[]).map((chore) => chore.id);
+    expect(ids).toContain(keep.id);
+    expect(ids).not.toContain(remove.id);
+  });
+
+  it('also removes the chore’s assignments and zone links', async () => {
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    const zoneId = await createZone(head.householdId, head.cookie, 'Cascade Zone', rootZoneId);
+    const chore = await postChore({ name: 'Cascade chore', type: 'single-time', zoneIds: [zoneId] });
+    const meResponse = await request(app).get('/api/auth/me').set('Cookie', member.cookie);
+    const memberId = meResponse.body.user.id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', head.cookie)
+      .send({ userId: memberId });
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(200);
+    const ids = (response.body.chores as { id: number }[]).map((c) => c.id);
+    expect(ids).not.toContain(chore.id);
+  });
+
+  it('rejects a non-head member with 403', async () => {
+    const chore = await postChore({ name: 'Not yours', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('rejects a non-existent chore id with 404', async () => {
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/999999`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('ChoreNotFound');
+  });
+
+  it('rejects a non-member of the household with a generic 404', async () => {
+    const chore = await postChore({ name: 'Outsider target', type: 'single-time', zoneIds: [] });
+    const outsider = await registerHeadOfHousehold('remove-outsider@example.com', 'Outsider House');
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${chore.id}`)
+      .set('Cookie', outsider.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('HouseholdNotFound');
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const chore = await postChore({ name: 'No cookie', type: 'single-time', zoneIds: [] });
+
+    const response = await request(app).delete(`/api/households/${head.householdId}/chores/${chore.id}`);
+
+    expect(response.status).toBe(401);
+  });
+});
+
 describe('POST /api/households/:householdId/chores/:choreId/assignments', () => {
   let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
   let member: Awaited<ReturnType<typeof registerAndJoin>>;

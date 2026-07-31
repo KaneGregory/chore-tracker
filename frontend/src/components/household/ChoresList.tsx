@@ -14,6 +14,8 @@ interface ChoresListProps {
   onUnassign: (choreId: number, assignmentId: number) => void;
   statusUpdatingKey: string | null;
   onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
+  removingChoreId: number | null;
+  onRemove: (choreId: number) => void;
 }
 
 export function ChoresList({
@@ -28,6 +30,8 @@ export function ChoresList({
   onUnassign,
   statusUpdatingKey,
   onSetStatus,
+  removingChoreId,
+  onRemove,
 }: ChoresListProps) {
   if (chores.length === 0) {
     return <p className="chores-empty">No chores yet.</p>;
@@ -49,6 +53,8 @@ export function ChoresList({
           onUnassign={onUnassign}
           statusUpdatingKey={statusUpdatingKey}
           onSetStatus={onSetStatus}
+          removingChoreId={removingChoreId}
+          onRemove={onRemove}
         />
       ))}
     </ul>

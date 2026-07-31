@@ -176,6 +176,25 @@ export function createChore(
   return attachDetailsToOne(chore);
 }
 
+export function removeChore(
+  householdId: number,
+  requestingUserId: number,
+  choreId: number,
+): ChoreSummary[] {
+  requireHeadMembership(householdId, requestingUserId);
+
+  const chore = findChoreInHousehold(householdId, choreId);
+  if (!chore) throw new ChoreNotFoundError();
+
+  // Relies on chore_zones' and chore_assignments' ON DELETE CASCADE (both FK to
+  // chores.id) to clean up the chore's zone links and assignments in the same
+  // statement.
+  db.delete(chores).where(eq(chores.id, choreId)).run();
+
+  const rows = db.select(CHORE_ROW_COLUMNS).from(chores).where(eq(chores.householdId, householdId)).all();
+  return attachDetails(rows);
+}
+
 export function assignChore(
   householdId: number,
   choreId: number,

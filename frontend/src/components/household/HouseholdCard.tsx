@@ -21,6 +21,7 @@ export function HouseholdCard({ household }: { household: Household }) {
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
   const [unassigningId, setUnassigningId] = useState<number | null>(null);
   const [statusUpdatingKey, setStatusUpdatingKey] = useState<string | null>(null);
+  const [removingChoreId, setRemovingChoreId] = useState<number | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -121,6 +122,18 @@ export function HouseholdCard({ household }: { household: Household }) {
     }
   }
 
+  async function handleRemoveChore(choreId: number) {
+    setRemovingChoreId(choreId);
+    setAssignError(null);
+    try {
+      setChores(await choreApi.removeChore(household.id, choreId));
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not remove that chore.');
+    } finally {
+      setRemovingChoreId(null);
+    }
+  }
+
   if (state.status !== 'authenticated') return null;
   const isHead = household.role === 'head';
 
@@ -142,6 +155,8 @@ export function HouseholdCard({ household }: { household: Household }) {
           onSetStatus={(choreId, zoneId, status) =>
             void handleSetStatus(choreId, zoneId, status)
           }
+          removingChoreId={removingChoreId}
+          onRemove={(choreId) => void handleRemoveChore(choreId)}
         />
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>
