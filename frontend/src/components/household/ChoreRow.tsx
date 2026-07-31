@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { Chore, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
-import { StatusToggle } from './StatusToggle';
 import { ChoreZoneSection } from './ChoreZoneSection';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
@@ -40,6 +39,8 @@ export function ChoreRow({
   const hasZones = chore.zones.length > 0;
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const isRemoving = removingChoreId === chore.id;
+  const isComplete = chore.status === 'complete';
+  const isUpdatingStatus = statusUpdatingKey === `${chore.id}:none`;
 
   function assignmentsFor(zoneId: number | null) {
     return chore.assignments.filter((assignment) => assignment.zoneId === zoneId);
@@ -59,31 +60,9 @@ export function ChoreRow({
       )}
       <div className="chore-row-main">
         <span className="chore-name">{chore.name}</span>
-        <div className="chore-row-actions">
-          {hasZones ? (
-            <span className={`chore-status-badge chore-status-${chore.status}`}>
-              {CHORE_STATUS_LABEL[chore.status]}
-            </span>
-          ) : (
-            <StatusToggle
-              status={chore.status}
-              disabled={statusUpdatingKey === `${chore.id}:none`}
-              onToggle={(status) => onSetStatus(chore.id, null, status)}
-            />
-          )}
-          <AssignmentChips
-            choreId={chore.id}
-            zoneId={null}
-            assignments={assignmentsFor(null)}
-            members={members}
-            currentUserId={currentUserId}
-            isHead={isHead}
-            assigningKey={assigningKey}
-            onAssign={onAssign}
-            unassigningId={unassigningId}
-            onUnassign={onUnassign}
-          />
-        </div>
+        <span className={`chore-status-badge chore-status-${chore.status}`}>
+          {CHORE_STATUS_LABEL[chore.status]}
+        </span>
       </div>
       {confirmingRemove && (
         <div className="zone-inline-form">
@@ -103,6 +82,30 @@ export function ChoreRow({
             Cancel
           </button>
         </div>
+      )}
+      <div className="chore-assignees">
+        <AssignmentChips
+          choreId={chore.id}
+          zoneId={null}
+          assignments={assignmentsFor(null)}
+          members={members}
+          currentUserId={currentUserId}
+          isHead={isHead}
+          assigningKey={assigningKey}
+          onAssign={onAssign}
+          unassigningId={unassigningId}
+          onUnassign={onUnassign}
+        />
+      </div>
+      {!hasZones && (
+        <button
+          type="button"
+          className="btn btn-pill-outline chore-status-btn"
+          disabled={isUpdatingStatus}
+          onClick={() => onSetStatus(chore.id, null, isComplete ? 'to-do' : 'complete')}
+        >
+          {isUpdatingStatus ? 'Updating…' : isComplete ? 'Mark as to-do' : 'Mark complete'}
+        </button>
       )}
       {hasZones && (
         <ul className="chore-zones">

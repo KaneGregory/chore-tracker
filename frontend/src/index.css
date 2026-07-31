@@ -721,7 +721,6 @@ fieldset.form-field legend,
 .chore-row-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
   padding-right: 24px;
@@ -732,11 +731,12 @@ fieldset.form-field legend,
   font-size: 0.92rem;
 }
 
-.chore-row-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.chore-assignees {
+  margin-top: 8px;
+}
+
+.chore-status-btn {
+  margin-top: 10px;
 }
 
 .chore-status-badge {
@@ -762,29 +762,6 @@ fieldset.form-field legend,
 .chore-status-overdue {
   color: var(--error);
   background: color-mix(in srgb, var(--error) 15%, transparent);
-}
-
-.status-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.status-toggle input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent-2);
-  cursor: pointer;
-}
-
-.status-toggle input:disabled {
-  cursor: default;
-  opacity: 0.6;
 }
 
 .chore-zones {
@@ -827,8 +804,15 @@ fieldset.form-field legend,
   color: inherit;
 }
 
-.chore-zone-name {
+.chore-zone-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
+  min-width: 0;
+}
+
+.chore-zone-name {
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -851,13 +835,6 @@ fieldset.form-field legend,
   gap: 10px;
   padding: 4px 10px 10px;
   border-top: 1px solid var(--line);
-}
-
-.chore-zone-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .status-dot {

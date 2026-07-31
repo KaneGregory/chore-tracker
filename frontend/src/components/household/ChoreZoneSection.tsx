@@ -47,7 +47,14 @@ export function ChoreZoneSection({
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
-        <span className="chore-zone-name">{zoneName}</span>
+        <span className="chore-zone-heading">
+          <span className="chore-zone-name">{zoneName}</span>
+          {expanded && (
+            <span className={`chore-status-badge chore-status-${zone.status}`}>
+              {CHORE_STATUS_LABEL[zone.status]}
+            </span>
+          )}
+        </span>
         {!expanded && (
           <span className="chore-zone-summary">
             {assignments.length > 0 && (
@@ -91,19 +98,14 @@ export function ChoreZoneSection({
             unassigningId={unassigningId}
             onUnassign={onUnassign}
           />
-          <div className="chore-zone-status-row">
-            <span className={`chore-status-badge chore-status-${zone.status}`}>
-              {CHORE_STATUS_LABEL[zone.status]}
-            </span>
-            <button
-              type="button"
-              className="btn btn-pill-outline"
-              disabled={isUpdatingStatus}
-              onClick={() => onSetStatus(choreId, zone.zoneId, isComplete ? 'to-do' : 'complete')}
-            >
-              {isUpdatingStatus ? 'Updating…' : isComplete ? 'Mark as to-do' : 'Mark complete'}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-pill-outline"
+            disabled={isUpdatingStatus}
+            onClick={() => onSetStatus(choreId, zone.zoneId, isComplete ? 'to-do' : 'complete')}
+          >
+            {isUpdatingStatus ? 'Updating…' : isComplete ? 'Mark as to-do' : 'Mark complete'}
+          </button>
         </div>
       )}
     </li>
