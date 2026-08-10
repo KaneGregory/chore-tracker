@@ -18,11 +18,16 @@ const joinHouseholdSchema = z.object({
     .regex(/^[0-9A-Z-]{4,12}$/),
 });
 
+export const householdChoiceSchema = z.discriminatedUnion('mode', [
+  createHouseholdSchema,
+  joinHouseholdSchema,
+]);
+
 export const registerSchema = z.object({
   email: emailSchema,
   username: usernameSchema,
   password: passwordSchema,
-  household: z.discriminatedUnion('mode', [createHouseholdSchema, joinHouseholdSchema]),
+  household: householdChoiceSchema,
 });
 
 export const loginSchema = z.object({
@@ -40,3 +45,4 @@ export const usernameAvailabilityQuerySchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type HouseholdChoiceInput = z.infer<typeof householdChoiceSchema>;

@@ -6,7 +6,9 @@ import type { HouseholdChoice } from '../../types/auth';
 interface HouseholdChoiceFormProps {
   submitting: boolean;
   onSubmit: (choice: HouseholdChoice) => void;
-  onBack: () => void;
+  // Omitted when this form isn't part of a multi-step wizard (see
+  // OnboardHouseholdPage) — there's nowhere to go "back" to in that context.
+  onBack?: () => void;
 }
 
 export function HouseholdChoiceForm({ submitting, onSubmit, onBack }: HouseholdChoiceFormProps) {
@@ -57,11 +59,13 @@ export function HouseholdChoiceForm({ submitting, onSubmit, onBack }: HouseholdC
         />
       )}
 
-      <div className="card-footer">
-        <button type="button" className="btn btn-text" disabled={submitting} onClick={onBack}>
-          Back
-        </button>
-      </div>
+      {onBack && (
+        <div className="card-footer">
+          <button type="button" className="btn btn-text" disabled={submitting} onClick={onBack}>
+            Back
+          </button>
+        </div>
+      )}
     </div>
   );
 }

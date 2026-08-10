@@ -44,16 +44,27 @@ async function registerHeadOfHousehold(email: string, householdName: string) {
   };
 }
 
-async function registerAndJoin(email: string, joinCode: string) {
+// Joins are 'pending' until a head approves them — this helper additionally
+// approves, so callers get the normal active member they depended on before that
+// concept existed.
+async function registerAndJoin(
+  email: string,
+  head: { cookie: string; householdId: number; joinCode: string },
+) {
   const response = await request(app)
     .post('/api/auth/register')
     .send({
       email,
       username: email.split('@')[0],
       password: 'correct-horse-battery',
-      household: { mode: 'join', joinCode },
+      household: { mode: 'join', joinCode: head.joinCode },
     });
-  return { cookie: cookieFrom(response) };
+  const cookie = cookieFrom(response);
+  const userId = response.body.user.id as number;
+  await request(app)
+    .post(`/api/households/${head.householdId}/members/${userId}/approve`)
+    .set('Cookie', head.cookie);
+  return { cookie, userId };
 }
 
 interface ZoneNode {
@@ -91,7 +102,7 @@ describe('GET /api/households/:householdId/zones', () => {
 
   it('is visible to any member, not just the head', async () => {
     const head = await registerHeadOfHousehold('zones-hoh2@example.com', 'Second House');
-    const member = await registerAndJoin('zones-member2@example.com', head.joinCode);
+    const member = await registerAndJoin('zones-member2@example.com', head);
 
     const response = await request(app)
       .get(`/api/households/${head.householdId}/zones`)
@@ -127,7 +138,7 @@ describe('POST /api/households/:householdId/zones', () => {
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('create-hoh@example.com', 'Create House');
-    member = await registerAndJoin('create-member@example.com', head.joinCode);
+    member = await registerAndJoin('create-member@example.com', head);
 
     const response = await request(app)
       .get(`/api/households/${head.householdId}/zones`)
@@ -208,7 +219,7 @@ describe('DELETE /api/households/:householdId/zones/:zoneId', () => {
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('remove-hoh@example.com', 'Remove House');
-    member = await registerAndJoin('remove-member@example.com', head.joinCode);
+    member = await registerAndJoin('remove-member@example.com', head);
 
     const response = await request(app)
       .get(`/api/households/${head.householdId}/zones`)

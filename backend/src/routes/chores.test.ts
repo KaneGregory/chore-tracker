@@ -43,16 +43,27 @@ async function registerHeadOfHousehold(email: string, householdName: string) {
   };
 }
 
-async function registerAndJoin(email: string, joinCode: string) {
+// Joins are 'pending' until a head approves them — this helper additionally
+// approves, so callers get the normal active member they depended on before that
+// concept existed.
+async function registerAndJoin(
+  email: string,
+  head: { cookie: string; householdId: number; joinCode: string },
+) {
   const response = await request(app)
     .post('/api/auth/register')
     .send({
       email,
       username: email.split('@')[0],
       password: 'correct-horse-battery',
-      household: { mode: 'join', joinCode },
+      household: { mode: 'join', joinCode: head.joinCode },
     });
-  return { cookie: cookieFrom(response) };
+  const cookie = cookieFrom(response);
+  const userId = response.body.user.id as number;
+  await request(app)
+    .post(`/api/households/${head.householdId}/members/${userId}/approve`)
+    .set('Cookie', head.cookie);
+  return { cookie, userId };
 }
 
 async function getRootZoneId(householdId: number, cookie: string): Promise<number> {
@@ -88,7 +99,7 @@ describe('POST /api/households/:householdId/chores', () => {
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('chores-hoh@example.com', 'Chores House');
-    member = await registerAndJoin('chores-member@example.com', head.joinCode);
+    member = await registerAndJoin('chores-member@example.com', head);
     rootZoneId = await getRootZoneId(head.householdId, head.cookie);
     kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
   });
@@ -211,7 +222,7 @@ describe('POST /api/households/:householdId/chores', () => {
 describe('GET /api/households/:householdId/chores', () => {
   it('is visible to any member and reflects assigned zones', async () => {
     const head = await registerHeadOfHousehold('chores-list-hoh@example.com', 'List House');
-    const member = await registerAndJoin('chores-list-member@example.com', head.joinCode);
+    const member = await registerAndJoin('chores-list-member@example.com', head);
     const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
 
     await request(app)
@@ -263,7 +274,7 @@ describe('DELETE /api/households/:householdId/chores/:choreId', () => {
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('remove-hoh@example.com', 'Remove House');
-    member = await registerAndJoin('remove-member@example.com', head.joinCode);
+    member = await registerAndJoin('remove-member@example.com', head);
   });
 
   async function postChore(body: Record<string, unknown>) {
@@ -359,8 +370,8 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('assign-hoh@example.com', 'Assign House');
-    member = await registerAndJoin('assign-member@example.com', head.joinCode);
-    otherMember = await registerAndJoin('assign-member-2@example.com', head.joinCode);
+    member = await registerAndJoin('assign-member@example.com', head);
+    otherMember = await registerAndJoin('assign-member-2@example.com', head);
     memberId = await meId(member.cookie);
     otherMemberId = await meId(otherMember.cookie);
     const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
@@ -603,8 +614,8 @@ describe('DELETE /api/households/:householdId/chores/:choreId/assignments/:assig
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('unassign-hoh@example.com', 'Unassign House');
-    member = await registerAndJoin('unassign-member@example.com', head.joinCode);
-    otherMember = await registerAndJoin('unassign-member-2@example.com', head.joinCode);
+    member = await registerAndJoin('unassign-member@example.com', head);
+    otherMember = await registerAndJoin('unassign-member-2@example.com', head);
     memberId = await meId(member.cookie);
     otherMemberId = await meId(otherMember.cookie);
     const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
@@ -778,7 +789,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('status-hoh@example.com', 'Status House');
-    member = await registerAndJoin('status-member@example.com', head.joinCode);
+    member = await registerAndJoin('status-member@example.com', head);
     const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
     kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
   });
@@ -920,7 +931,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
 
   beforeAll(async () => {
     head = await registerHeadOfHousehold('zonestatus-hoh@example.com', 'Zone Status House');
-    member = await registerAndJoin('zonestatus-member@example.com', head.joinCode);
+    member = await registerAndJoin('zonestatus-member@example.com', head);
     const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
     kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
     bathroomZoneId = await createZone(head.householdId, head.cookie, 'Bathroom', rootZoneId);

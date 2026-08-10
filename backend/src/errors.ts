@@ -82,6 +82,18 @@ export class CannotDemoteHouseholdCreatorError extends AppError {
   }
 }
 
+export class ApplicationNotPendingError extends AppError {
+  constructor() {
+    super(400, 'ApplicationNotPending', 'That application has already been resolved');
+  }
+}
+
+export class TargetMemberHasAccountError extends AppError {
+  constructor() {
+    super(400, 'TargetMemberHasAccount', 'That member already has an account of their own');
+  }
+}
+
 export class ZoneNotFoundError extends AppError {
   constructor() {
     super(404, 'ZoneNotFound', 'That zone was not found');

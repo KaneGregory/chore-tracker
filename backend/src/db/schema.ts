@@ -3,6 +3,13 @@ import { sqliteTable, text, integer, unique, type AnySQLiteColumn } from 'drizzl
 export const HOUSEHOLD_ROLES = ['member', 'head'] as const;
 export type HouseholdRole = (typeof HOUSEHOLD_ROLES)[number];
 
+// A row joining via join code starts 'pending' and has no real household access
+// (see membershipAuth.requireMembership) until a Head of Household approves,
+// assigns, or declines it (householdService.ts). A household's own creator, and
+// anyone a Head creates directly via createMember, start 'active' immediately.
+export const HOUSEHOLD_MEMBER_STATUSES = ['pending', 'active'] as const;
+export type HouseholdMemberStatus = (typeof HOUSEHOLD_MEMBER_STATUSES)[number];
+
 export const households = sqliteTable('households', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
@@ -40,6 +47,7 @@ export const householdMembers = sqliteTable(
       .notNull()
       .references(() => households.id, { onDelete: 'cascade' }),
     role: text('role', { enum: HOUSEHOLD_ROLES }).notNull().default('member'),
+    status: text('status', { enum: HOUSEHOLD_MEMBER_STATUSES }).notNull().default('active'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [unique().on(table.userId, table.householdId)],

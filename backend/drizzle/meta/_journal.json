@@ -71,6 +71,13 @@
       "when": 1786376253288,
       "tag": "0009_robust_blur",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786380818674,
+      "tag": "0010_shocking_puck",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { apiRequest } from './httpClient';
-import type { HouseholdMember } from '../types/auth';
+import type { Household, HouseholdChoice, HouseholdMember } from '../types/auth';
 
 interface MembersResponse {
   members: HouseholdMember[];
@@ -41,4 +41,46 @@ export async function demoteMember(
     { method: 'POST' },
   );
   return response.members;
+}
+
+export async function approveMember(
+  householdId: number,
+  userId: number,
+): Promise<HouseholdMember[]> {
+  const response = await apiRequest<MembersResponse>(
+    `/api/households/${householdId}/members/${userId}/approve`,
+    { method: 'POST' },
+  );
+  return response.members;
+}
+
+export async function declineMember(
+  householdId: number,
+  userId: number,
+): Promise<HouseholdMember[]> {
+  const response = await apiRequest<MembersResponse>(
+    `/api/households/${householdId}/members/${userId}/decline`,
+    { method: 'POST' },
+  );
+  return response.members;
+}
+
+export async function assignPendingMember(
+  householdId: number,
+  userId: number,
+  targetMemberId: number,
+): Promise<HouseholdMember[]> {
+  const response = await apiRequest<MembersResponse>(
+    `/api/households/${householdId}/members/${userId}/assign`,
+    { method: 'POST', body: JSON.stringify({ targetMemberId }) },
+  );
+  return response.members;
+}
+
+export async function createOrJoinHousehold(choice: HouseholdChoice): Promise<Household> {
+  const response = await apiRequest<{ household: Household }>('/api/households', {
+    method: 'POST',
+    body: JSON.stringify(choice),
+  });
+  return response.household;
 }

@@ -24,6 +24,7 @@ export function MembersPage() {
   const [addingMember, setAddingMember] = useState(false);
   const [newMemberUsername, setNewMemberUsername] = useState('');
   const [creatingMember, setCreatingMember] = useState(false);
+  const [resolvingPendingKey, setResolvingPendingKey] = useState<string | null>(null);
 
   const household =
     state.status === 'authenticated'
@@ -90,6 +91,44 @@ export function MembersPage() {
     }
   }
 
+  async function handleApprove(userId: number) {
+    setResolvingPendingKey(`${userId}:approve`);
+    setMembersError(null);
+    try {
+      setMembers(await householdApi.approveMember(householdId, userId));
+    } catch (err) {
+      setMembersError(err instanceof ApiError ? err.message : 'Could not approve that person.');
+    } finally {
+      setResolvingPendingKey(null);
+    }
+  }
+
+  async function handleDecline(userId: number) {
+    setResolvingPendingKey(`${userId}:decline`);
+    setMembersError(null);
+    try {
+      setMembers(await householdApi.declineMember(householdId, userId));
+    } catch (err) {
+      setMembersError(
+        err instanceof ApiError ? err.message : 'Could not decline that application.',
+      );
+    } finally {
+      setResolvingPendingKey(null);
+    }
+  }
+
+  async function handleAssign(userId: number, targetMemberId: number) {
+    setResolvingPendingKey(`${userId}:assign`);
+    setMembersError(null);
+    try {
+      setMembers(await householdApi.assignPendingMember(householdId, userId, targetMemberId));
+    } catch (err) {
+      setMembersError(err instanceof ApiError ? err.message : 'Could not assign that applicant.');
+    } finally {
+      setResolvingPendingKey(null);
+    }
+  }
+
   async function handleCreateMember(event: FormEvent) {
     event.preventDefault();
     const trimmed = newMemberUsername.trim();
@@ -138,6 +177,10 @@ export function MembersPage() {
           onPromote={(userId) => void handlePromote(userId)}
           demotingId={demotingId}
           onDemote={(userId) => void handleDemote(userId)}
+          resolvingPendingKey={resolvingPendingKey}
+          onApprove={(userId) => void handleApprove(userId)}
+          onDecline={(userId) => void handleDecline(userId)}
+          onAssign={(userId, targetMemberId) => void handleAssign(userId, targetMemberId)}
         />
       ) : (
         !membersError && <p className="members-loading">Loading members…</p>

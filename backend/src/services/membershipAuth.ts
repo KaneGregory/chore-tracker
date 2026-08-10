@@ -6,16 +6,20 @@ import { HouseholdNotFoundError, NotHeadOfHouseholdError } from '../errors.js';
 
 export function getMembership(householdId: number, userId: number) {
   return db
-    .select({ role: householdMembers.role })
+    .select({ role: householdMembers.role, status: householdMembers.status })
     .from(householdMembers)
     .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)))
     .get();
 }
 
-/** Throws HouseholdNotFoundError if the user isn't a member of this household. */
+/**
+ * Throws HouseholdNotFoundError if the user isn't an active member of this
+ * household — including if they're only a 'pending' applicant, who has no real
+ * household access yet (see householdService.ts's approve/decline/assign flow).
+ */
 export function requireMembership(householdId: number, userId: number): HouseholdRole {
   const membership = getMembership(householdId, userId);
-  if (!membership) throw new HouseholdNotFoundError();
+  if (!membership || membership.status !== 'active') throw new HouseholdNotFoundError();
   return membership.role;
 }
 

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { households, householdMembers, sessions, users, zones } from '../db/schema.js';
-import type { HouseholdRole } from '../db/schema.js';
+import type { HouseholdMemberStatus, HouseholdRole } from '../db/schema.js';
 import type { Transaction } from '../db/client.js';
 import {
   generateJoinCode,
@@ -16,7 +16,7 @@ import {
   InvalidJoinCodeError,
   UsernameAlreadyTakenError,
 } from '../errors.js';
-import type { RegisterInput, LoginInput } from '../validation/authSchemas.js';
+import type { HouseholdChoiceInput, RegisterInput, LoginInput } from '../validation/authSchemas.js';
 
 export const SESSION_TTL_MS = (Number(process.env.SESSION_TTL_DAYS) || 30) * 24 * 60 * 60 * 1000;
 
@@ -33,6 +33,7 @@ export interface PublicHousehold {
   name: string;
   joinCode: string;
   role: HouseholdRole;
+  status: HouseholdMemberStatus;
 }
 
 export interface AuthResult {
@@ -84,7 +85,7 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
   const now = Date.now();
   const expiresAt = now + SESSION_TTL_MS;
 
-  const { user, household, role } = db.transaction((tx) => {
+  const { user, household, role, status } = db.transaction((tx) => {
     const existingUser = tx
       .select({ id: users.id })
       .from(users)
@@ -105,12 +106,16 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
       .returning()
       .get();
 
-    // The person who creates a household is its first Head of Household.
+    // The person who creates a household is its first Head of Household, active
+    // immediately. Joining via code instead starts 'pending' — no real household
+    // access (see membershipAuth.requireMembership) until a head resolves it.
     let household: typeof households.$inferSelect;
     let role: HouseholdRole;
+    let status: HouseholdMemberStatus;
     if (input.household.mode === 'create') {
       household = insertHouseholdWithUniqueJoinCode(tx, input.household.name, user.id, now);
       role = 'head';
+      status = 'active';
       // Every household starts with one unremovable root zone representing
       // the household itself, which every other zone nests under.
       tx.insert(zones)
@@ -127,15 +132,16 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
       if (!found) throw new InvalidJoinCodeError();
       household = found;
       role = 'member';
+      status = 'pending';
     }
 
     tx.insert(householdMembers)
-      .values({ userId: user.id, householdId: household.id, role, createdAt: now })
+      .values({ userId: user.id, householdId: household.id, role, status, createdAt: now })
       .run();
 
     tx.insert(sessions).values({ token, userId: user.id, createdAt: now, expiresAt }).run();
 
-    return { user, household, role };
+    return { user, household, role, status };
   });
 
   return {
@@ -143,9 +149,55 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
     // directly (see householdService.createMember); a user just inserted here from
     // register() always has a real one, since input.email is a required field.
     user: { id: user.id, email: user.email!, username: user.username },
-    households: [{ id: household.id, name: household.name, joinCode: household.joinCode, role }],
+    households: [
+      { id: household.id, name: household.name, joinCode: household.joinCode, role, status },
+    ],
     token,
   };
+}
+
+// Lets an already-authenticated user with no household of their own (e.g. after
+// their pending application was declined, see householdService.declineMember) pick
+// one, the same way the household step of register() does — minus creating a user
+// or session, since both already exist.
+export function addHouseholdForExistingUser(
+  requestingUserId: number,
+  choice: HouseholdChoiceInput,
+): PublicHousehold {
+  const now = Date.now();
+
+  return db.transaction((tx) => {
+    let household: typeof households.$inferSelect;
+    let role: HouseholdRole;
+    let status: HouseholdMemberStatus;
+
+    if (choice.mode === 'create') {
+      household = insertHouseholdWithUniqueJoinCode(tx, choice.name, requestingUserId, now);
+      role = 'head';
+      status = 'active';
+      tx.insert(zones)
+        .values({
+          householdId: household.id,
+          parentZoneId: null,
+          name: household.name,
+          createdAt: now,
+        })
+        .run();
+    } else {
+      const joinCode = normalizeJoinCode(choice.joinCode);
+      const found = tx.select().from(households).where(eq(households.joinCode, joinCode)).get();
+      if (!found) throw new InvalidJoinCodeError();
+      household = found;
+      role = 'member';
+      status = 'pending';
+    }
+
+    tx.insert(householdMembers)
+      .values({ userId: requestingUserId, householdId: household.id, role, status, createdAt: now })
+      .run();
+
+    return { id: household.id, name: household.name, joinCode: household.joinCode, role, status };
+  });
 }
 
 export async function login(input: LoginInput): Promise<AuthResult> {
@@ -167,6 +219,7 @@ export async function login(input: LoginInput): Promise<AuthResult> {
       name: households.name,
       joinCode: households.joinCode,
       role: householdMembers.role,
+      status: householdMembers.status,
     })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))
@@ -201,6 +254,7 @@ export function getSessionUser(
       name: households.name,
       joinCode: households.joinCode,
       role: householdMembers.role,
+      status: householdMembers.status,
     })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))

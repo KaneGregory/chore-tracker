@@ -7,6 +7,9 @@ export interface AuthContextValue {
   register: (input: RegisterRequest) => Promise<void>;
   login: (input: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
+  // Re-reads the current session, e.g. after joining/creating a household from the
+  // onboarding screen, or to check whether a pending application has been resolved.
+  refresh: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

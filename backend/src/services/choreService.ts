@@ -206,7 +206,10 @@ export function assignChore(
   const chore = findChoreInHousehold(householdId, choreId);
   if (!chore) throw new ChoreNotFoundError();
 
-  if (assigneeUserId !== requestingUserId && !getMembership(householdId, assigneeUserId)) {
+  if (
+    assigneeUserId !== requestingUserId &&
+    getMembership(householdId, assigneeUserId)?.status !== 'active'
+  ) {
     throw new MemberNotFoundError();
   }
 

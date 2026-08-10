@@ -97,6 +97,33 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   a global user property. A user who isn't a member of a household gets the same
   generic 404 (`HouseholdNotFound`) whether the household doesn't exist or they're
   just not in it — same "don't leak existence" pattern as `InvalidJoinCode`.
+* Joining a household via code doesn't grant access immediately:
+  `household_members.status` is `'pending'` or `'active'`. Creating a household (and
+  being created directly by a head — see the account-less-members bullet below) is
+  `'active'` right away; joining via code starts `'pending'` until a Head of
+  Household resolves it. `membershipAuth.requireMembership` treats a `'pending'` row
+  as equivalent to no membership at all (same generic `HouseholdNotFound`) — a
+  pending applicant has zero household access, not reduced access, until resolved.
+  A head resolves a pending applicant one of three ways, all in
+  `householdService.ts`: **approve** (`status` → `'active'`, ordinary new member);
+  **decline** (deletes the `household_members` row only — their account and any
+  *other* household memberships survive untouched, so "removed from the household"
+  doesn't mean "deleted"); or **assign** to an existing account-less member (see
+  below) when the applicant is actually that same real person joining for the first
+  time — this transplants the applicant's `email`/`passwordHash` onto the
+  account-less member's existing `users` row (preserving its id, username, role, and
+  chore-assignment history) and deletes the applicant's now-redundant row, rather
+  than creating a second membership for the same person. Regular (non-head) members
+  never see pending applicants in the members list at all —
+  `getMembersForRequester` filters them out unless the requester is a head.
+  Frontend routing for this lives in `ProtectedRoute.tsx`: an authenticated user with
+  no *active* household is shown `PendingApprovalPage` (if they have a pending one)
+  or `OnboardHouseholdPage` (if they have none at all — e.g. right after being
+  declined) instead of the normal app, regardless of which page they were headed to.
+  `OnboardHouseholdPage` and `POST /api/households` (`authService.addHouseholdForExistingUser`)
+  exist because registration used to be the *only* way to create/join a household —
+  don't remove that route thinking it's dead code just because `RegisterPage` doesn't
+  call it.
 * Not every member has a login: a Head of Household can create a member directly
   (`POST /households/:householdId/members`, `householdService.createMember`) for
   someone who won't ever sign in themselves (e.g. a young child, a relative who just
@@ -222,8 +249,15 @@ Run from within `backend/` or `frontend/` unless noted:
 * No way to change a username after registration, and pre-existing accounts from
   before the username migration got an auto-generated `user-<id>` placeholder instead
   of a real one — there's no UI to fix that up.
-* No demotion (head → member) and no way to remove a member from a household — only
-  promotion exists, per what was actually asked for.
+* No way to remove an already-*active* member from a household — declining only
+  applies to a still-`pending` applicant (see the pending-approval bullet in
+  Architectural decisions); once approved, a member is permanent apart from
+  promote/demote. Promotion and demotion (head ↔ member) both exist.
+* No realtime notification of any kind for the pending-approval flow — a pending
+  applicant only finds out they've been approved/declined by clicking "Check again"
+  (or reloading/re-logging-in) on `PendingApprovalPage`, and a declined applicant
+  gets no email or in-app message explaining why; they just land back on
+  `OnboardHouseholdPage` next time.
 * Zones can't be renamed after creation — only create/remove/move were asked for.
 * Removing a zone cascades to everything nested inside it, with no undo — an inline
   "are you sure" confirmation guards this in the UI, but there's no soft-delete or

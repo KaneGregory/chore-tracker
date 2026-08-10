@@ -16,3 +16,7 @@ export const memberParamsSchema = z.object({
 export const createMemberSchema = z.object({
   username: usernameSchema,
 });
+
+export const assignPendingMemberSchema = z.object({
+  targetMemberId: idParam,
+});

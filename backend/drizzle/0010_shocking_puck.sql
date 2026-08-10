@@ -1,0 +1,1 @@
+ALTER TABLE `household_members` ADD `status` text DEFAULT 'active' NOT NULL;

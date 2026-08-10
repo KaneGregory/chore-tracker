@@ -7,18 +7,22 @@ import type { LoginRequest, RegisterRequest } from '../types/auth';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialAuthState);
 
-  useEffect(() => {
-    authApi
-      .getMe()
-      .then((response) =>
-        dispatch({
-          type: 'SESSION_CHECK_COMPLETE',
-          user: response.user,
-          households: response.households,
-        }),
-      )
-      .catch(() => dispatch({ type: 'SESSION_CHECK_COMPLETE', user: null, households: [] }));
+  const refresh = useCallback(async () => {
+    try {
+      const response = await authApi.getMe();
+      dispatch({
+        type: 'SESSION_CHECK_COMPLETE',
+        user: response.user,
+        households: response.households,
+      });
+    } catch {
+      dispatch({ type: 'SESSION_CHECK_COMPLETE', user: null, households: [] });
+    }
   }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const register = useCallback(async (input: RegisterRequest) => {
     const response = await authApi.register(input);
@@ -36,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ state, register, login, logout }}>
+    <AuthContext.Provider value={{ state, register, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

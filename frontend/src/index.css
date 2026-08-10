@@ -559,6 +559,25 @@ a {
   color: rgb(210, 200, 0);
 }
 
+.pending-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pending-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--tape) 70%, var(--ink));
+  background: color-mix(in srgb, var(--tape) 30%, transparent);
+}
+
 .section-label {
   font-size: 0.78rem;
   font-weight: 700;

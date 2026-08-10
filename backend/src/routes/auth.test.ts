@@ -117,7 +117,13 @@ describe('POST /api/auth/register', () => {
     expect(response.body.user.email).toBe('alice@example.com');
     expect(response.body.user.username).toBe('alice');
     expect(response.body.households).toEqual([
-      { id: expect.any(Number), name: 'The Smiths', joinCode: expect.any(String), role: 'head' },
+      {
+        id: expect.any(Number),
+        name: 'The Smiths',
+        joinCode: expect.any(String),
+        role: 'head',
+        status: 'active',
+      },
     ]);
     expect(response.headers['set-cookie']).toBeDefined();
   });
@@ -182,7 +188,7 @@ describe('POST /api/auth/register', () => {
     expect(response.body.error).toBe('InvalidJoinCode');
   });
 
-  it('lets a second user join a household created by the first, via a normalized join code', async () => {
+  it('lets a second user join a household created by the first as a pending applicant, via a normalized join code', async () => {
     const created = await request(app)
       .post('/api/auth/register')
       .send({
@@ -193,6 +199,7 @@ describe('POST /api/auth/register', () => {
       });
 
     expect(created.body.households[0].role).toBe('head');
+    expect(created.body.households[0].status).toBe('active');
 
     const lowercased: string = created.body.households[0].joinCode.toLowerCase();
     const lowercaseHyphenatedCode = `${lowercased.slice(0, 4)}-${lowercased.slice(4)}`;
@@ -209,6 +216,7 @@ describe('POST /api/auth/register', () => {
     expect(response.status).toBe(201);
     expect(response.body.households[0].id).toBe(created.body.households[0].id);
     expect(response.body.households[0].role).toBe('member');
+    expect(response.body.households[0].status).toBe('pending');
   });
 
   it('rejects a password shorter than 8 characters with a 400 validation error', async () => {

@@ -29,7 +29,7 @@ export function CreateHouseholdForm({ submitting, onSubmit }: CreateHouseholdFor
         className="btn btn-primary btn-block"
         disabled={submitting || name.trim().length === 0}
       >
-        {submitting ? 'Creating account…' : 'Create household'}
+        {submitting ? 'Creating…' : 'Create household'}
       </button>
     </form>
   );
