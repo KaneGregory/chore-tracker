@@ -13,7 +13,7 @@ interface PendingMemberActionsProps {
   onAssign: (userId: number, targetMemberId: number) => void;
 }
 
-type Mode = 'idle' | 'assigning' | 'declining';
+type Mode = 'idle' | 'choosing' | 'assigning' | 'declining';
 
 export function PendingMemberActions({
   pendingUserId,
@@ -31,6 +31,48 @@ export function PendingMemberActions({
   const isDeclining = resolvingKey === `${pendingUserId}:decline`;
   const isAssigning = resolvingKey === `${pendingUserId}:assign`;
 
+  function handleConfirm() {
+    // Nothing to choose between if there's no account-less member they could be —
+    // confirming just makes them a normal new member.
+    if (accountLessMembers.length === 0) {
+      onApprove(pendingUserId);
+    } else {
+      setMode('choosing');
+    }
+  }
+
+  if (mode === 'choosing') {
+    return (
+      <div className="zone-inline-form">
+        <span>New member, or someone already in the household?</span>
+        <button
+          type="button"
+          className="btn btn-pill-outline"
+          disabled={busy}
+          onClick={() => onApprove(pendingUserId)}
+        >
+          {isApproving ? 'Confirming…' : 'New member'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-pill-outline"
+          disabled={busy}
+          onClick={() => setMode('assigning')}
+        >
+          Existing member
+        </button>
+        <button
+          type="button"
+          className="btn btn-text"
+          disabled={busy}
+          onClick={() => setMode('idle')}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
   if (mode === 'assigning') {
     return (
       <div className="zone-inline-form">
@@ -41,7 +83,7 @@ export function PendingMemberActions({
           onChange={(event) => setTargetMemberId(Number(event.target.value))}
         >
           <option value="" disabled>
-            Assign to…
+            Which one?
           </option>
           {accountLessMembers.map((member) => (
             <option value={member.id} key={member.id}>
@@ -55,13 +97,13 @@ export function PendingMemberActions({
           disabled={busy || targetMemberId === ''}
           onClick={() => onAssign(pendingUserId, targetMemberId as number)}
         >
-          {isAssigning ? 'Assigning…' : 'Confirm'}
+          {isAssigning ? 'Confirming…' : 'Confirm'}
         </button>
         <button
           type="button"
           className="btn btn-text"
           disabled={busy}
-          onClick={() => setMode('idle')}
+          onClick={() => setMode('choosing')}
         >
           Cancel
         </button>
@@ -100,20 +142,10 @@ export function PendingMemberActions({
         type="button"
         className="btn btn-pill-outline"
         disabled={busy}
-        onClick={() => onApprove(pendingUserId)}
+        onClick={handleConfirm}
       >
-        {isApproving ? 'Approving…' : 'Approve'}
+        {isApproving ? 'Confirming…' : 'Confirm'}
       </button>
-      {accountLessMembers.length > 0 && (
-        <button
-          type="button"
-          className="btn btn-pill-outline"
-          disabled={busy}
-          onClick={() => setMode('assigning')}
-        >
-          Assign…
-        </button>
-      )}
       <button
         type="button"
         className="btn btn-text"
