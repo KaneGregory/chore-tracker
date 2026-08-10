@@ -5,6 +5,7 @@ import {
   CannotDemoteHouseholdCreatorError,
   CannotDemoteSelfError,
   MemberNotFoundError,
+  UsernameAlreadyTakenError,
 } from '../errors.js';
 import { getMembership, requireHeadMembership, requireMembership } from './membershipAuth.js';
 
@@ -42,6 +43,38 @@ export function getMembersForRequester(
   requestingUserId: number,
 ): HouseholdMember[] {
   requireMembership(householdId, requestingUserId);
+  return listMembers(householdId);
+}
+
+export function createMember(
+  householdId: number,
+  requestingUserId: number,
+  username: string,
+): HouseholdMember[] {
+  requireHeadMembership(householdId, requestingUserId);
+
+  const now = Date.now();
+  db.transaction((tx) => {
+    const existingUsername = tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, username))
+      .get();
+    if (existingUsername) throw new UsernameAlreadyTakenError();
+
+    // No email/passwordHash — this member has no account of their own and can never
+    // log in (see authService.login, which can only find a user by a non-null email).
+    const newUser = tx
+      .insert(users)
+      .values({ username, email: null, passwordHash: null, createdAt: now })
+      .returning()
+      .get();
+
+    tx.insert(householdMembers)
+      .values({ userId: newUser.id, householdId, role: 'member', createdAt: now })
+      .run();
+  });
+
   return listMembers(householdId);
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { MembersList } from '../components/household/MembersList';
@@ -21,6 +21,9 @@ export function MembersPage() {
   const [promotingId, setPromotingId] = useState<number | null>(null);
   const [demotingId, setDemotingId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [addingMember, setAddingMember] = useState(false);
+  const [newMemberUsername, setNewMemberUsername] = useState('');
+  const [creatingMember, setCreatingMember] = useState(false);
 
   const household =
     state.status === 'authenticated'
@@ -87,6 +90,24 @@ export function MembersPage() {
     }
   }
 
+  async function handleCreateMember(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = newMemberUsername.trim();
+    if (!trimmed) return;
+    setCreatingMember(true);
+    setMembersError(null);
+    try {
+      const updated = await householdApi.createMember(householdId, trimmed);
+      setMembers(updated);
+      setNewMemberUsername('');
+      setAddingMember(false);
+    } catch (err) {
+      setMembersError(err instanceof ApiError ? err.message : 'Could not create that member.');
+    } finally {
+      setCreatingMember(false);
+    }
+  }
+
   if (state.status === 'loading') return null;
   if (state.status !== 'authenticated' || !household) {
     return <Navigate to="/" replace />;
@@ -121,6 +142,27 @@ export function MembersPage() {
       ) : (
         !membersError && <p className="members-loading">Loading members…</p>
       )}
+      {household.role === 'head' &&
+        (addingMember ? (
+          <form className="zone-inline-form" onSubmit={(event) => void handleCreateMember(event)}>
+            <input
+              autoFocus
+              value={newMemberUsername}
+              onChange={(event) => setNewMemberUsername(event.target.value)}
+              placeholder="e.g. Grandma"
+            />
+            <button type="submit" className="btn btn-pill-outline" disabled={creatingMember}>
+              {creatingMember ? 'Adding…' : 'Add'}
+            </button>
+            <button type="button" className="btn btn-text" onClick={() => setAddingMember(false)}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="btn btn-text" onClick={() => setAddingMember(true)}>
+            + Add member
+          </button>
+        ))}
       <p className="card-footer">
         <Link to="/">Back</Link>
       </p>

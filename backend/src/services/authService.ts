@@ -139,7 +139,10 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
   });
 
   return {
-    user: { id: user.id, email: user.email, username: user.username },
+    // email/passwordHash are nullable only for members a Head of Household creates
+    // directly (see householdService.createMember); a user just inserted here from
+    // register() always has a real one, since input.email is a required field.
+    user: { id: user.id, email: user.email!, username: user.username },
     households: [{ id: household.id, name: household.name, joinCode: household.joinCode, role }],
     token,
   };
@@ -149,7 +152,9 @@ export async function login(input: LoginInput): Promise<AuthResult> {
   const user = db.select().from(users).where(eq(users.email, input.email)).get();
   if (!user) throw new InvalidCredentialsError();
 
-  const passwordValid = await verifyPassword(user.passwordHash, input.password);
+  // A row can only be found here by matching a non-null email, so both fields below
+  // are guaranteed non-null — an account-less member (see createMember) has neither.
+  const passwordValid = await verifyPassword(user.passwordHash!, input.password);
   if (!passwordValid) throw new InvalidCredentialsError();
 
   const token = generateSessionToken();
@@ -171,7 +176,7 @@ export async function login(input: LoginInput): Promise<AuthResult> {
   db.insert(sessions).values({ token, userId: user.id, createdAt: now, expiresAt }).run();
 
   return {
-    user: { id: user.id, email: user.email, username: user.username },
+    user: { id: user.id, email: user.email!, username: user.username },
     households: memberHouseholds,
     token,
   };
@@ -203,7 +208,10 @@ export function getSessionUser(
     .all();
 
   return {
-    user: { id: user.id, email: user.email, username: user.username },
+    // Sessions are only ever created in register()/login() for a real account, so a
+    // user reachable via a live session always has a real email — never one of
+    // createMember's account-less members, which can't log in to get a session.
+    user: { id: user.id, email: user.email!, username: user.username },
     households: memberHouseholds,
   };
 }

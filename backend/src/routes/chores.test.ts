@@ -399,6 +399,33 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
     ]);
   });
 
+  it('lets a head assign a chore to an account-less member, exactly like any other member', async () => {
+    const createResponse = await request(app)
+      .post(`/api/households/${head.householdId}/members`)
+      .set('Cookie', head.cookie)
+      .send({ username: 'toddler' });
+    const accountLessMemberId = createResponse.body.members.find(
+      (m: { username: string }) => m.username === 'toddler',
+    ).id;
+
+    const chore = await postChore({ name: 'Nap time', zoneIds: [] });
+
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', head.cookie)
+      .send({ userId: accountLessMemberId });
+
+    expect(response.status).toBe(201);
+    expect(response.body.chore.assignments).toEqual([
+      {
+        id: expect.any(Number),
+        userId: accountLessMemberId,
+        username: 'toddler',
+        zoneId: null,
+      },
+    ]);
+  });
+
   it('lets a member assign a chore scoped to one of its zones', async () => {
     const chore = await postChore({ name: 'Wash dishes', zoneIds: [kitchenZoneId] });
 

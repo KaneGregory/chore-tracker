@@ -49,6 +49,20 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
 * Backend: Node.js + TypeScript + Express. Database: SQLite via Drizzle ORM
   (`drizzle-orm` + `better-sqlite3` driver) — schema in `backend/src/db/schema.ts`,
   migrations generated with `npm run db:generate` and committed to `backend/drizzle/`.
+  `runMigrations()` (`backend/src/db/client.ts`) toggles `PRAGMA foreign_keys` off
+  before calling drizzle's `migrate()` and back on after — needed because any
+  migration that recreates a table (dropping a `NOT NULL` constraint, e.g. migration
+  `0009`) uses drizzle-kit's generated `PRAGMA foreign_keys=OFF/ON` around the
+  drop+rename, but that pragma is a silent no-op once a transaction is open, and
+  drizzle's migrator wraps every pending migration in one. Without the toggle in
+  `runMigrations()` itself, such a migration passes against a fresh/empty database
+  (nothing to violate a constraint yet) and then fails with `FOREIGN KEY constraint
+  failed` the moment it runs for real against a database that already has rows in a
+  table referencing the one being recreated — this happened for real once, see
+  migration `0009`'s history. Verify any future table-recreating migration against a
+  scratch copy of the real database using the actual `runMigrations()` function (a
+  small `tsx` script with `DB_FILE` pointed at the copy), not the raw `sqlite3` CLI —
+  the CLI runs statements in autocommit mode and won't reproduce this class of bug.
 * Auth: email + password, hashed with `argon2` (library defaults). Sessions are
   server-side rows (`sessions` table) referenced by an opaque random token stored in
   an httpOnly cookie — not JWT — so a session can be revoked by deleting its row.
@@ -83,6 +97,18 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   a global user property. A user who isn't a member of a household gets the same
   generic 404 (`HouseholdNotFound`) whether the household doesn't exist or they're
   just not in it — same "don't leak existence" pattern as `InvalidJoinCode`.
+* Not every member has a login: a Head of Household can create a member directly
+  (`POST /households/:householdId/members`, `householdService.createMember`) for
+  someone who won't ever sign in themselves (e.g. a young child, a relative who just
+  wants chores tracked for them). `users.email` and `users.passwordHash` are nullable
+  for exactly this case (migration `0009` — SQLite requires recreating the table to
+  drop a NOT NULL constraint, same as any other such change here) — a member created
+  this way gets neither, and is structurally unable to log in as a result:
+  `authService.login` can only ever find a row by a non-null email, so there's no
+  login path to block, rather than one that's explicitly disabled. Everywhere else,
+  this kind of member is a completely ordinary `household_members` row — same role,
+  same chore assignment, same promote/demote — since every other query keys off
+  `userId`, not login status.
 * Households have a tree of "zones" (`zones` table, self-referencing via
   `parent_zone_id`) for organizing chores by area later — e.g. "Upstairs" containing
   "Bedroom". Every household gets one root zone (named after the household,

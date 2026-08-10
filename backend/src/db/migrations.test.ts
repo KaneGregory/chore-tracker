@@ -86,4 +86,27 @@ describe('migrations', () => {
       ]),
     );
   });
+
+  // Migration 0009 recreates `users` (to make email/password_hash nullable), which
+  // requires disabling FK enforcement for that step since other tables reference
+  // `users` — runMigrations() does this around the whole migration run, not inside
+  // any single migration's own SQL, because a mid-transaction `PRAGMA foreign_keys`
+  // change is silently ignored by SQLite (drizzle's migrator wraps every pending
+  // migration in one transaction). This regressed once already: it passed against a
+  // fresh, empty database (nothing to violate a constraint yet) but broke on startup
+  // against a real database with existing rows. These two guard that FK enforcement
+  // is unconditionally back on afterward for normal app operation, not left disabled.
+  it('leaves foreign key enforcement on after running migrations', () => {
+    expect(sqlite.pragma('foreign_keys', { simple: true })).toBe(1);
+  });
+
+  it('genuinely enforces foreign keys after running migrations, not just reports them on', () => {
+    expect(() =>
+      sqlite
+        .prepare(
+          'INSERT INTO household_members (user_id, household_id, role, created_at) VALUES (999999, 999999, ?, ?)',
+        )
+        .run('member', Date.now()),
+    ).toThrow(/FOREIGN KEY constraint failed/);
+  });
 });

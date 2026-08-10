@@ -112,6 +112,73 @@ describe('GET /api/households/:householdId/members', () => {
   });
 });
 
+describe('POST /api/households/:householdId/members', () => {
+  let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
+  let member: Awaited<ReturnType<typeof registerAndJoin>>;
+
+  beforeAll(async () => {
+    head = await registerHeadOfHousehold('create-member-hoh@example.com', 'Create Member House');
+    member = await registerAndJoin('create-member-member@example.com', head.joinCode);
+  });
+
+  it('lets the head of household create a member with no account of their own', async () => {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/members`)
+      .set('Cookie', head.cookie)
+      .send({ username: 'grandma' });
+
+    expect(response.status).toBe(201);
+    const created = response.body.members.find(
+      (m: { username: string }) => m.username === 'grandma',
+    );
+    expect(created).toMatchObject({ username: 'grandma', role: 'member', isCreator: false });
+
+    const row = sqlite
+      .prepare('SELECT email, password_hash FROM users WHERE id = ?')
+      .get(created.id) as { email: string | null; password_hash: string | null };
+    expect(row.email).toBeNull();
+    expect(row.password_hash).toBeNull();
+  });
+
+  it('rejects a duplicate username with 409', async () => {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/members`)
+      .set('Cookie', head.cookie)
+      .send({ username: 'grandma' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe('UsernameAlreadyTaken');
+  });
+
+  it('rejects creation attempts from a member who is not head of household', async () => {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/members`)
+      .set('Cookie', member.cookie)
+      .send({ username: 'grandpa' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('rejects an empty username with 400', async () => {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/members`)
+      .set('Cookie', head.cookie)
+      .send({ username: '  ' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/members`)
+      .send({ username: 'uncle-joe' });
+
+    expect(response.status).toBe(401);
+  });
+});
+
 describe('POST /api/households/:householdId/members/:userId/promote', () => {
   let head: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
   let memberA: Awaited<ReturnType<typeof registerAndJoin>>;

@@ -18,9 +18,14 @@ export const households = sqliteTable('households', {
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  email: text('email').notNull().unique(),
+  // Null for a member a Head of Household creates directly (see
+  // householdService.createMember) rather than through registration — such a member
+  // has no login of their own, and can never log in since there's no email to
+  // authenticate with.
+  email: text('email').unique(),
   username: text('username').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  // Null for the same account-less members as `email` above.
+  passwordHash: text('password_hash'),
   createdAt: integer('created_at').notNull(),
 });
 

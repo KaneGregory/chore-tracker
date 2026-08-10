@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { NotAuthenticatedError, ValidationError } from '../errors.js';
-import { householdParamsSchema, memberParamsSchema } from '../validation/householdSchemas.js';
+import {
+  createMemberSchema,
+  householdParamsSchema,
+  memberParamsSchema,
+} from '../validation/householdSchemas.js';
 import * as householdService from '../services/householdService.js';
 
 export const householdsRouter = Router();
@@ -20,6 +24,33 @@ householdsRouter.get('/:householdId/members', (req, res, next) => {
   try {
     const members = householdService.getMembersForRequester(parsed.data.householdId, req.user.id);
     res.status(200).json({ members });
+  } catch (err) {
+    next(err);
+  }
+});
+
+householdsRouter.post('/:householdId/members', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = householdParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid household id', paramsParsed.error.issues));
+    return;
+  }
+
+  const bodyParsed = createMemberSchema.safeParse(req.body);
+  if (!bodyParsed.success) {
+    next(new ValidationError('Invalid member details', bodyParsed.error.issues));
+    return;
+  }
+
+  try {
+    const members = householdService.createMember(
+      paramsParsed.data.householdId,
+      req.user.id,
+      bodyParsed.data.username,
+    );
+    res.status(201).json({ members });
   } catch (err) {
     next(err);
   }

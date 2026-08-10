@@ -10,6 +10,17 @@ export async function listMembers(householdId: number): Promise<HouseholdMember[
   return response.members;
 }
 
+export async function createMember(
+  householdId: number,
+  username: string,
+): Promise<HouseholdMember[]> {
+  const response = await apiRequest<MembersResponse>(`/api/households/${householdId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+  return response.members;
+}
+
 export async function promoteMember(
   householdId: number,
   userId: number,
