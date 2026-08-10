@@ -553,6 +553,15 @@ describe('POST /api/households/:householdId/members/:userId/assign', () => {
       .send({ email: 'assign-applicant@example.com', password: 'correct-horse-battery' });
     expect(loginResponse.status).toBe(200);
     expect(loginResponse.body.user.username).toBe('grandma-placeholder');
+
+    // The applicant's session from before the merge still works too — they land on
+    // the household as the merged identity instead of being logged out.
+    const meResponse = await request(app).get('/api/auth/me').set('Cookie', applicant.cookie);
+    expect(meResponse.status).toBe(200);
+    expect(meResponse.body.user.username).toBe('grandma-placeholder');
+    expect(meResponse.body.households).toEqual([
+      expect.objectContaining({ id: head.householdId, role: 'member', status: 'active' }),
+    ]);
   });
 
   it('rejects assigning to a member who already has an account of their own', async () => {

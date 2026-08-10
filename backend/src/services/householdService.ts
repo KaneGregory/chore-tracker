@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { households, householdMembers, users } from '../db/schema.js';
+import { households, householdMembers, sessions, users } from '../db/schema.js';
 import type { HouseholdMemberStatus } from '../db/schema.js';
 import {
   ApplicationNotPendingError,
@@ -231,6 +231,14 @@ export function assignPendingMember(
     .get()!;
 
   db.transaction((tx) => {
+    // Moved first, while pendingUserId still exists to satisfy the FK: without this,
+    // deleting the pending user below cascades away their session too, silently
+    // logging them out instead of leaving them signed in as the merged identity.
+    tx.update(sessions)
+      .set({ userId: targetMemberId })
+      .where(eq(sessions.userId, pendingUserId))
+      .run();
+
     // Deleted first: the target's row can't take over this email while the pending
     // user's row (which currently holds it) still exists, since email is unique.
     // Cascades away the now-orphaned pending household_members row too.

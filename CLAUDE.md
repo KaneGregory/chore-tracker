@@ -113,7 +113,13 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   time — this transplants the applicant's `email`/`passwordHash` onto the
   account-less member's existing `users` row (preserving its id, username, role, and
   chore-assignment history) and deletes the applicant's now-redundant row, rather
-  than creating a second membership for the same person. Regular (non-head) members
+  than creating a second membership for the same person. Before deleting that row,
+  it also re-points any of the applicant's `sessions` at the account-less member's id
+  — without this, the cascade delete on the applicant's `users` row takes their
+  session with it, silently logging out whoever's mid-flow on `PendingApprovalPage`
+  instead of landing them on the household as the merged identity (this regressed
+  once already; the fix is the `UPDATE sessions` in `assignPendingMember` that runs
+  before the delete, not after). Regular (non-head) members
   never see pending applicants in the members list at all —
   `getMembersForRequester` filters them out unless the requester is a head.
   Frontend routing for this lives in `ProtectedRoute.tsx`: an authenticated user with
