@@ -41,7 +41,12 @@ export interface AuthResult {
   token: string;
 }
 
-function insertHouseholdWithUniqueJoinCode(tx: Transaction, name: string, now: number) {
+function insertHouseholdWithUniqueJoinCode(
+  tx: Transaction,
+  name: string,
+  createdByUserId: number,
+  now: number,
+) {
   for (let attempt = 0; attempt < JOIN_CODE_GENERATION_ATTEMPTS; attempt++) {
     const joinCode = generateJoinCode();
     const existing = tx
@@ -50,7 +55,11 @@ function insertHouseholdWithUniqueJoinCode(tx: Transaction, name: string, now: n
       .where(eq(households.joinCode, joinCode))
       .get();
     if (existing) continue;
-    return tx.insert(households).values({ name, joinCode, createdAt: now }).returning().get();
+    return tx
+      .insert(households)
+      .values({ name, joinCode, createdByUserId, createdAt: now })
+      .returning()
+      .get();
   }
   throw new Error('Failed to generate a unique household join code');
 }
@@ -100,7 +109,7 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
     let household: typeof households.$inferSelect;
     let role: HouseholdRole;
     if (input.household.mode === 'create') {
-      household = insertHouseholdWithUniqueJoinCode(tx, input.household.name, now);
+      household = insertHouseholdWithUniqueJoinCode(tx, input.household.name, user.id, now);
       role = 'head';
       // Every household starts with one unremovable root zone representing
       // the household itself, which every other zone nests under.

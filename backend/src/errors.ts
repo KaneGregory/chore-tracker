@@ -66,6 +66,22 @@ export class MemberNotFoundError extends AppError {
   }
 }
 
+export class CannotDemoteSelfError extends AppError {
+  constructor() {
+    super(400, 'CannotDemoteSelf', 'You can’t demote yourself');
+  }
+}
+
+export class CannotDemoteHouseholdCreatorError extends AppError {
+  constructor() {
+    super(
+      400,
+      'CannotDemoteHouseholdCreator',
+      'The person who created this household can’t be demoted',
+    );
+  }
+}
+
 export class ZoneNotFoundError extends AppError {
   constructor() {
     super(404, 'ZoneNotFound', 'That zone was not found');

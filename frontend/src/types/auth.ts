@@ -17,6 +17,8 @@ export interface HouseholdMember {
   id: number;
   username: string;
   role: HouseholdRole;
+  // The person who originally created the household — permanently immune to demotion.
+  isCreator: boolean;
 }
 
 export type HouseholdChoice = { mode: 'create'; name: string } | { mode: 'join'; joinCode: string };

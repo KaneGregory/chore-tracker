@@ -20,3 +20,14 @@ export async function promoteMember(
   );
   return response.members;
 }
+
+export async function demoteMember(
+  householdId: number,
+  userId: number,
+): Promise<HouseholdMember[]> {
+  const response = await apiRequest<MembersResponse>(
+    `/api/households/${householdId}/members/${userId}/demote`,
+    { method: 'POST' },
+  );
+  return response.members;
+}

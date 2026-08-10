@@ -68,14 +68,21 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   future migration.
 * Household roles: `household_members.role` is `'member'` or `'head'` (Head of
   Household). Whoever creates a household is its first head; whoever joins via code
-  starts as a plain member. Only a head can promote another member to head (one-way —
-  there's no demotion yet). Authorization for this lives in
-  `backend/src/services/householdService.ts`, not in routes or middleware: every
-  household-scoped action re-checks the requester's own membership row for that
-  specific household id, since role is per-household, not a global user property. A
-  user who isn't a member of a household gets the same generic 404
-  (`HouseholdNotFound`) whether the household doesn't exist or they're just not in
-  it — same "don't leak existence" pattern as `InvalidJoinCode`.
+  starts as a plain member. Any head can promote another member to head, and any head
+  can demote another head back to member — except the household's original creator,
+  who can never be demoted by anyone (including themselves), and a head can't demote
+  themselves either (only "other" heads, per what was asked). The creator is tracked
+  explicitly via `households.createdByUserId` (migration `0008`, backfilled for
+  pre-existing households from each household's earliest `household_members` row —
+  ordered by id, which is always the creation-time head, since a household can't be
+  joined via code before it exists) rather than inferred from role state, since role
+  alone can't distinguish the creator from any other head once there's more than one.
+  Authorization for promote/demote lives in `backend/src/services/householdService.ts`,
+  not in routes or middleware: every household-scoped action re-checks the requester's
+  own membership row for that specific household id, since role is per-household, not
+  a global user property. A user who isn't a member of a household gets the same
+  generic 404 (`HouseholdNotFound`) whether the household doesn't exist or they're
+  just not in it — same "don't leak existence" pattern as `InvalidJoinCode`.
 * Households have a tree of "zones" (`zones` table, self-referencing via
   `parent_zone_id`) for organizing chores by area later — e.g. "Upstairs" containing
   "Bedroom". Every household gets one root zone (named after the household,

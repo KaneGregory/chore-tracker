@@ -6,7 +6,8 @@ export const householdParamsSchema = z.object({
   householdId: idParam,
 });
 
-export const promoteParamsSchema = z.object({
+// Shared by both the promote and demote member-action routes — same shape either way.
+export const memberParamsSchema = z.object({
   householdId: idParam,
   userId: idParam,
 });

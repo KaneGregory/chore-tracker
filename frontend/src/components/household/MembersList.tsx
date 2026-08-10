@@ -8,6 +8,8 @@ interface MembersListProps {
   currentUserIsHead: boolean;
   promotingId: number | null;
   onPromote: (userId: number) => void;
+  demotingId: number | null;
+  onDemote: (userId: number) => void;
 }
 
 export function MembersList({
@@ -16,6 +18,8 @@ export function MembersList({
   currentUserIsHead,
   promotingId,
   onPromote,
+  demotingId,
+  onDemote,
 }: MembersListProps) {
   return (
     <ul className="members-list">
@@ -26,9 +30,21 @@ export function MembersList({
             {member.id === currentUserId && <span className="member-you"> (you)</span>}
           </span>
           {member.role === 'head' ? (
-            <span className="role-badge">
-              <FontAwesomeIcon className="role-badge-icon" icon={faCrown} aria-hidden="true" />{' '}
-              Head of Household
+            <span className="member-head-actions">
+              <span className="role-badge">
+                <FontAwesomeIcon className="role-badge-icon" icon={faCrown} aria-hidden="true" />{' '}
+                Head of Household
+              </span>
+              {currentUserIsHead && !member.isCreator && member.id !== currentUserId && (
+                <button
+                  type="button"
+                  className="btn btn-pill-outline"
+                  disabled={demotingId === member.id}
+                  onClick={() => onDemote(member.id)}
+                >
+                  {demotingId === member.id ? 'Demoting…' : 'Demote'}
+                </button>
+              )}
             </span>
           ) : (
             currentUserIsHead && (

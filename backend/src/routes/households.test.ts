@@ -72,8 +72,8 @@ describe('GET /api/households/:householdId/members', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.members).toEqual([
-      { id: head.userId, username: 'hoh', role: 'head' },
-      { id: member.userId, username: 'member', role: 'member' },
+      { id: head.userId, username: 'hoh', role: 'head', isCreator: true },
+      { id: member.userId, username: 'member', role: 'member', isCreator: false },
     ]);
   });
 
@@ -156,6 +156,81 @@ describe('POST /api/households/:householdId/members/:userId/promote', () => {
   it('rejects an unauthenticated request with 401', async () => {
     const response = await request(app).post(
       `/api/households/${head.householdId}/members/${memberB.userId}/promote`,
+    );
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('POST /api/households/:householdId/members/:userId/demote', () => {
+  let creator: Awaited<ReturnType<typeof registerHeadOfHousehold>>;
+  let secondHead: Awaited<ReturnType<typeof registerAndJoin>>;
+  let member: Awaited<ReturnType<typeof registerAndJoin>>;
+
+  beforeAll(async () => {
+    creator = await registerHeadOfHousehold('demo-creator@example.com', 'Demotion House');
+    secondHead = await registerAndJoin('demo-second-head@example.com', creator.joinCode);
+    member = await registerAndJoin('demo-member@example.com', creator.joinCode);
+
+    await request(app)
+      .post(`/api/households/${creator.householdId}/members/${secondHead.userId}/promote`)
+      .set('Cookie', creator.cookie);
+  });
+
+  it('lets the head of household demote another head back to member', async () => {
+    const response = await request(app)
+      .post(`/api/households/${creator.householdId}/members/${secondHead.userId}/demote`)
+      .set('Cookie', creator.cookie);
+
+    expect(response.status).toBe(200);
+    const demoted = response.body.members.find((m: { id: number }) => m.id === secondHead.userId);
+    expect(demoted.role).toBe('member');
+  });
+
+  it('rejects demotion attempts from a member who is not head of household', async () => {
+    const response = await request(app)
+      .post(`/api/households/${creator.householdId}/members/${creator.userId}/demote`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('rejects a head demoting themselves with 400', async () => {
+    const response = await request(app)
+      .post(`/api/households/${creator.householdId}/members/${creator.userId}/demote`)
+      .set('Cookie', creator.cookie);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('CannotDemoteSelf');
+  });
+
+  it('rejects demoting the household creator, even by another head', async () => {
+    await request(app)
+      .post(`/api/households/${creator.householdId}/members/${secondHead.userId}/promote`)
+      .set('Cookie', creator.cookie);
+
+    const response = await request(app)
+      .post(`/api/households/${creator.householdId}/members/${creator.userId}/demote`)
+      .set('Cookie', secondHead.cookie);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('CannotDemoteHouseholdCreator');
+  });
+
+  it('rejects demoting someone who is not a member of the household', async () => {
+    const outsider = await registerHeadOfHousehold('demo-outsider@example.com', 'Other House');
+
+    const response = await request(app)
+      .post(`/api/households/${creator.householdId}/members/${outsider.userId}/demote`)
+      .set('Cookie', creator.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('MemberNotFound');
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const response = await request(app).post(
+      `/api/households/${creator.householdId}/members/${member.userId}/demote`,
     );
     expect(response.status).toBe(401);
   });

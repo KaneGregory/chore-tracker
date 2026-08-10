@@ -19,6 +19,7 @@ export function MembersPage() {
   const [members, setMembers] = useState<HouseholdMember[] | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [promotingId, setPromotingId] = useState<number | null>(null);
+  const [demotingId, setDemotingId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
   const household =
@@ -73,6 +74,19 @@ export function MembersPage() {
     }
   }
 
+  async function handleDemote(userId: number) {
+    setDemotingId(userId);
+    setMembersError(null);
+    try {
+      const updated = await householdApi.demoteMember(householdId, userId);
+      setMembers(updated);
+    } catch (err) {
+      setMembersError(err instanceof ApiError ? err.message : 'Could not demote that person.');
+    } finally {
+      setDemotingId(null);
+    }
+  }
+
   if (state.status === 'loading') return null;
   if (state.status !== 'authenticated' || !household) {
     return <Navigate to="/" replace />;
@@ -101,6 +115,8 @@ export function MembersPage() {
           currentUserIsHead={household.role === 'head'}
           promotingId={promotingId}
           onPromote={(userId) => void handlePromote(userId)}
+          demotingId={demotingId}
+          onDemote={(userId) => void handleDemote(userId)}
         />
       ) : (
         !membersError && <p className="members-loading">Loading members…</p>

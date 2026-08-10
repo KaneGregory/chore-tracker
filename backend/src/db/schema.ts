@@ -7,6 +7,12 @@ export const households = sqliteTable('households', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   joinCode: text('join_code').notNull().unique(),
+  // The user who created this household — permanently immune to demotion (see
+  // householdService.demoteMember). `users` is defined further down this file, hence
+  // the lazy callback, same pattern as zones' self-reference below.
+  createdByUserId: integer('created_by_user_id')
+    .notNull()
+    .references((): AnySQLiteColumn => users.id),
   createdAt: integer('created_at').notNull(),
 });
 

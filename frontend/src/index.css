@@ -541,6 +541,12 @@ a {
   color: var(--muted);
 }
 
+.member-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .role-badge {
   font-size: 0.78rem;
   font-weight: 700;
