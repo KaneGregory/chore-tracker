@@ -6,12 +6,23 @@ import { pushSubscriptions } from '../db/schema.js';
 export interface PushSubscriptionInput {
   endpoint: string;
   keys: { p256dh: string; auth: string };
+  timezone: string;
 }
 
 export interface PushPayload {
   title: string;
   body: string;
   url?: string;
+}
+
+// The minimal shape sendToSubscriptionRow actually needs — callers (notifyUser's
+// fan-out, and dailyReminderScheduler's single-device send) can pass a richer row
+// (e.g. one that also carries timezone/lastDailyReminderAt) and it structurally fits.
+export interface PushSubscriptionRow {
+  id: number;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
 }
 
 interface VapidConfig {
@@ -44,14 +55,22 @@ export function saveSubscription(userId: number, subscription: PushSubscriptionI
       endpoint: subscription.endpoint,
       p256dh: subscription.keys.p256dh,
       auth: subscription.keys.auth,
+      timezone: subscription.timezone,
       createdAt: now,
     })
-    // Re-subscribing (e.g. after clearing site data) reuses the same endpoint —
-    // treat it as claiming/refreshing the row rather than erroring on the unique
-    // constraint.
+    // Re-subscribing (e.g. after clearing site data, or NotificationOptIn's silent
+    // timezone resync on load) reuses the same endpoint — treat it as
+    // claiming/refreshing the row rather than erroring on the unique constraint.
+    // Deliberately doesn't touch lastDailyReminderAt: a resync shouldn't reset
+    // "already checked today" and risk a duplicate daily reminder.
     .onConflictDoUpdate({
       target: pushSubscriptions.endpoint,
-      set: { userId, p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+      set: {
+        userId,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+        timezone: subscription.timezone,
+      },
     })
     .run();
 }
@@ -63,9 +82,34 @@ export function removeSubscription(userId: number, endpoint: string): void {
 }
 
 // Best-effort and not awaited by callers: a dead subscription or push-service outage
-// must never break the chore mutation that triggered this. A 404/410 response means
-// the browser has discarded that subscription, so the row is deleted here rather than
-// requiring a separate sweep job.
+// must never break whatever triggered this. A 404/410 response means the browser has
+// discarded that subscription, so the row is deleted here rather than requiring a
+// separate sweep job.
+function sendToSubscriptionRow(
+  config: VapidConfig,
+  subscription: PushSubscriptionRow,
+  payload: PushPayload,
+): void {
+  webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
+  webpush
+    .sendNotification(
+      {
+        endpoint: subscription.endpoint,
+        keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+      },
+      JSON.stringify(payload),
+    )
+    .catch((err: unknown) => {
+      const statusCode = (err as { statusCode?: number }).statusCode;
+      if (statusCode === 404 || statusCode === 410) {
+        db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, subscription.id)).run();
+      } else {
+        console.error('Failed to send push notification:', err);
+      }
+    });
+}
+
+// Fans out to every device the user has enabled notifications on.
 export function notifyUser(userId: number, payload: PushPayload): void {
   const config = getVapidConfig();
   if (!config) {
@@ -74,7 +118,6 @@ export function notifyUser(userId: number, payload: PushPayload): void {
     );
     return;
   }
-  webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
 
   const subscriptions = db
     .select()
@@ -83,21 +126,15 @@ export function notifyUser(userId: number, payload: PushPayload): void {
     .all();
 
   for (const subscription of subscriptions) {
-    webpush
-      .sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-        },
-        JSON.stringify(payload),
-      )
-      .catch((err: unknown) => {
-        const statusCode = (err as { statusCode?: number }).statusCode;
-        if (statusCode === 404 || statusCode === 410) {
-          db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, subscription.id)).run();
-        } else {
-          console.error('Failed to send push notification:', err);
-        }
-      });
+    sendToSubscriptionRow(config, subscription, payload);
   }
+}
+
+// Sends to exactly one device, not the user's whole fleet — used by
+// dailyReminderScheduler.ts, which checks (and must notify) each subscription
+// independently at its own device's local 9am, not all of a user's devices at once.
+export function notifyOneSubscription(subscription: PushSubscriptionRow, payload: PushPayload): void {
+  const config = getVapidConfig();
+  if (!config) return;
+  sendToSubscriptionRow(config, subscription, payload);
 }

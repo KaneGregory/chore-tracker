@@ -1,12 +1,12 @@
 import { apiRequest } from './httpClient';
-import type { PushSubscriptionJson } from '../types/push';
+import type { SubscribePushRequest } from '../types/push';
 
 export async function getPublicKey(): Promise<string | null> {
   const response = await apiRequest<{ publicKey: string | null }>('/api/push/public-key');
   return response.publicKey;
 }
 
-export function subscribe(subscription: PushSubscriptionJson): Promise<void> {
+export function subscribe(subscription: SubscribePushRequest): Promise<void> {
   return apiRequest<void>('/api/push/subscribe', {
     method: 'POST',
     body: JSON.stringify(subscription),

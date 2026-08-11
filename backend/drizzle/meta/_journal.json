@@ -85,6 +85,13 @@
       "when": 1786393762256,
       "tag": "0011_luxuriant_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786470816903,
+      "tag": "0012_perpetual_microchip",
+      "breakpoints": true
     }
   ]
 }

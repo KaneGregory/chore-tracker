@@ -23,6 +23,22 @@ export async function getExistingSubscription(): Promise<PushSubscription | null
   return registration.pushManager.getSubscription();
 }
 
+function getTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+function toSubscribeRequest(subscription: PushSubscription) {
+  const json = subscription.toJSON();
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
+    throw new Error('Unexpected push subscription shape from the browser.');
+  }
+  return {
+    endpoint: json.endpoint,
+    keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+    timezone: getTimeZone(),
+  };
+}
+
 export async function subscribeToPush(): Promise<void> {
   const publicKey = await pushApi.getPublicKey();
   if (!publicKey) throw new Error('Push notifications are not configured on the server.');
@@ -36,15 +52,7 @@ export async function subscribeToPush(): Promise<void> {
     applicationServerKey: urlBase64ToUint8Array(publicKey),
   });
 
-  const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
-    throw new Error('Unexpected push subscription shape from the browser.');
-  }
-
-  await pushApi.subscribe({
-    endpoint: json.endpoint,
-    keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-  });
+  await pushApi.subscribe(toSubscribeRequest(subscription));
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
@@ -52,4 +60,19 @@ export async function unsubscribeFromPush(): Promise<void> {
   if (!subscription) return;
   await pushApi.unsubscribe(subscription.endpoint);
   await subscription.unsubscribe();
+}
+
+// Best-effort, silent: keeps the server's record of this device's time zone fresh
+// (it drives the daily reminder's "9am local time" check) for anyone who already
+// subscribed before that feature existed, or who's since traveled — without asking
+// them to re-opt-in. Never surfaces an error; a failed resync just means the next
+// mount tries again.
+export async function resyncPushSubscription(): Promise<void> {
+  const subscription = await getExistingSubscription();
+  if (!subscription) return;
+  try {
+    await pushApi.subscribe(toSubscribeRequest(subscription));
+  } catch {
+    // Silent by design — see comment above.
+  }
 }

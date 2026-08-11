@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import {
   getExistingSubscription,
   isPushSupported,
+  resyncPushSubscription,
   subscribeToPush,
   unsubscribeFromPush,
 } from '../../utils/push';
@@ -19,6 +20,7 @@ export function NotificationOptIn() {
     getExistingSubscription()
       .then((subscription) => {
         if (!cancelled) setStatus(subscription ? 'on' : 'off');
+        if (subscription) void resyncPushSubscription();
       })
       .catch(() => {
         if (!cancelled) setStatus('off');

@@ -75,6 +75,7 @@ describe('POST /api/push/subscribe', () => {
       .send({
         endpoint: 'https://push.example.com/subscribe-1',
         keys: { p256dh: 'p256dh-value', auth: 'auth-value' },
+        timezone: 'America/New_York',
       });
 
     expect(response.status).toBe(204);
@@ -86,7 +87,7 @@ describe('POST /api/push/subscribe', () => {
     const response = await request(app)
       .post('/api/push/subscribe')
       .set('Cookie', cookie)
-      .send({ endpoint: 'https://push.example.com/subscribe-2' });
+      .send({ endpoint: 'https://push.example.com/subscribe-2', timezone: 'America/New_York' });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('ValidationError');
@@ -98,7 +99,23 @@ describe('POST /api/push/subscribe', () => {
     const response = await request(app)
       .post('/api/push/subscribe')
       .set('Cookie', cookie)
-      .send({ endpoint: 'not-a-url', keys: { p256dh: 'a', auth: 'a' } });
+      .send({ endpoint: 'not-a-url', keys: { p256dh: 'a', auth: 'a' }, timezone: 'America/New_York' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('rejects an invalid time zone with 400', async () => {
+    const cookie = await register('push-subscribe-bad-timezone@example.com');
+
+    const response = await request(app)
+      .post('/api/push/subscribe')
+      .set('Cookie', cookie)
+      .send({
+        endpoint: 'https://push.example.com/subscribe-3',
+        keys: { p256dh: 'a', auth: 'a' },
+        timezone: 'Mars/Olympus_Mons',
+      });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('ValidationError');
@@ -119,7 +136,7 @@ describe('POST /api/push/subscribe', () => {
     const response = await request(app)
       .post('/api/push/subscribe')
       .set('Cookie', cookie)
-      .send({ endpoint, keys: { p256dh: 'a', auth: 'a' } });
+      .send({ endpoint, keys: { p256dh: 'a', auth: 'a' }, timezone: 'America/New_York' });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('ValidationError');
@@ -140,7 +157,7 @@ describe('POST /api/push/unsubscribe', () => {
     await request(app)
       .post('/api/push/subscribe')
       .set('Cookie', cookie)
-      .send({ endpoint, keys: { p256dh: 'a', auth: 'a' } });
+      .send({ endpoint, keys: { p256dh: 'a', auth: 'a' }, timezone: 'America/New_York' });
 
     const response = await request(app)
       .post('/api/push/unsubscribe')
@@ -157,7 +174,7 @@ describe('POST /api/push/unsubscribe', () => {
     await request(app)
       .post('/api/push/subscribe')
       .set('Cookie', owner)
-      .send({ endpoint, keys: { p256dh: 'a', auth: 'a' } });
+      .send({ endpoint, keys: { p256dh: 'a', auth: 'a' }, timezone: 'America/New_York' });
 
     const response = await request(app)
       .post('/api/push/unsubscribe')

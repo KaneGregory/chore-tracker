@@ -15,7 +15,11 @@ import {
   ZoneNotFoundError,
 } from '../errors.js';
 import { getMembership, requireHeadMembership, requireMembership } from './membershipAuth.js';
-import { notifyUser } from './pushService.js';
+import {
+  queueAssignmentNotification,
+  queueOverdueNotification,
+  queueReopenedNotification,
+} from './notificationBatcher.js';
 
 export interface ChoreAssignmentSummary {
   id: number;
@@ -57,11 +61,25 @@ function deriveChoreStatus(ownStatus: ChoreStatus, zoneStatuses: ChoreStatus[]):
   );
 }
 
-// Assignees to notify when a chore/zone goes overdue: anyone assigned directly to
+type QueueNotificationFn = (
+  userId: number,
+  choreId: number,
+  zoneId: number | null,
+  choreName: string,
+) => void;
+
+// Assignees to notify on a chore/zone status change: anyone assigned directly to
 // that zone, plus anyone assigned to the whole chore (zoneId IS NULL applies across
 // all of its zones) — same "whole chore vs. one zone" split the schema documents for
-// choreAssignments.zoneId.
-function notifyAssigneesOverdue(choreId: number, zoneId: number | null, choreName: string): void {
+// choreAssignments.zoneId. Never queues for requestingUserId — a user is never
+// notified about a change they made themselves.
+function notifyAssignees(
+  choreId: number,
+  zoneId: number | null,
+  choreName: string,
+  requestingUserId: number,
+  queueFn: QueueNotificationFn,
+): void {
   const assignments = db
     .select({ userId: choreAssignments.userId })
     .from(choreAssignments)
@@ -76,8 +94,9 @@ function notifyAssigneesOverdue(choreId: number, zoneId: number | null, choreNam
     .all();
 
   const userIds = new Set(assignments.map((row) => row.userId));
+  userIds.delete(requestingUserId);
   for (const userId of userIds) {
-    notifyUser(userId, { title: 'Chore overdue', body: choreName, url: '/' });
+    queueFn(userId, choreId, zoneId, choreName);
   }
 }
 
@@ -146,6 +165,36 @@ function attachDetails(choreRows: ChoreRow[]): ChoreSummary[] {
 // already-fetched chore row, which always yields exactly one result.
 function attachDetailsToOne(choreRow: ChoreRow): ChoreSummary {
   return attachDetails([choreRow])[0]!;
+}
+
+// Internal system query for dailyReminderScheduler.ts — not exposed via any route, so
+// it deliberately skips the requireMembership/requester-vs-subject checks every
+// user-facing chore query goes through; there's no "requester" here, just "does this
+// user have anything outstanding right now."
+export function userHasIncompleteAssignedChores(userId: number): boolean {
+  const assignments = db
+    .select({ choreId: choreAssignments.choreId, zoneId: choreAssignments.zoneId })
+    .from(choreAssignments)
+    .where(eq(choreAssignments.userId, userId))
+    .all();
+
+  const choreIds = [...new Set(assignments.map((assignment) => assignment.choreId))];
+  if (choreIds.length === 0) return false;
+
+  const choreRows = db.select(CHORE_ROW_COLUMNS).from(chores).where(inArray(chores.id, choreIds)).all();
+  const summaryByChoreId = new Map(attachDetails(choreRows).map((summary) => [summary.id, summary]));
+
+  for (const assignment of assignments) {
+    const summary = summaryByChoreId.get(assignment.choreId);
+    if (!summary) continue;
+    if (assignment.zoneId === null) {
+      if (summary.status !== 'complete') return true;
+    } else {
+      const zone = summary.zones.find((candidate) => candidate.zoneId === assignment.zoneId);
+      if (zone && zone.status !== 'complete') return true;
+    }
+  }
+  return false;
 }
 
 export function listChoresForRequester(
@@ -279,7 +328,7 @@ export function assignChore(
   });
 
   if (assigneeUserId !== requestingUserId) {
-    notifyUser(assigneeUserId, { title: 'New chore assigned', body: chore.name, url: '/' });
+    queueAssignmentNotification(assigneeUserId, choreId, zoneId, chore.name);
   }
 
   return attachDetailsToOne(chore);
@@ -331,10 +380,13 @@ export function setChoreStatus(
     .get();
   if (anyZoneLink) throw new ChoreStatusManagedByZonesError();
 
+  const previousStatus = chore.status;
   db.update(chores).set({ status }).where(eq(chores.id, choreId)).run();
 
   if (status === 'overdue') {
-    notifyAssigneesOverdue(choreId, null, chore.name);
+    notifyAssignees(choreId, null, chore.name, requestingUserId, queueOverdueNotification);
+  } else if (status === 'to-do' && previousStatus === 'complete') {
+    notifyAssignees(choreId, null, chore.name, requestingUserId, queueReopenedNotification);
   }
 
   return attachDetailsToOne({ ...chore, status });
@@ -354,7 +406,7 @@ export function setChoreZoneStatus(
   if (!chore) throw new ChoreNotFoundError();
 
   const link = db
-    .select({ id: choreZones.id })
+    .select({ id: choreZones.id, status: choreZones.status })
     .from(choreZones)
     .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
     .get();
@@ -363,7 +415,9 @@ export function setChoreZoneStatus(
   db.update(choreZones).set({ status }).where(eq(choreZones.id, link.id)).run();
 
   if (status === 'overdue') {
-    notifyAssigneesOverdue(choreId, zoneId, chore.name);
+    notifyAssignees(choreId, zoneId, chore.name, requestingUserId, queueOverdueNotification);
+  } else if (status === 'to-do' && link.status === 'complete') {
+    notifyAssignees(choreId, zoneId, chore.name, requestingUserId, queueReopenedNotification);
   }
 
   return attachDetailsToOne(chore);

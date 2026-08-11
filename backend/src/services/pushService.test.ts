@@ -87,10 +87,12 @@ describe('with VAPID keys configured', () => {
     pushService.saveSubscription(userId, {
       endpoint: 'https://push.example.com/sub-1',
       keys: { p256dh: 'p256dh-a', auth: 'auth-a' },
+      timezone: 'America/New_York',
     });
     pushService.saveSubscription(otherUserId, {
       endpoint: 'https://push.example.com/sub-1',
       keys: { p256dh: 'p256dh-b', auth: 'auth-b' },
+      timezone: 'America/New_York',
     });
 
     const rows = db.select().from(pushSubscriptions).all();
@@ -102,6 +104,7 @@ describe('with VAPID keys configured', () => {
     pushService.saveSubscription(userId, {
       endpoint: 'https://push.example.com/sub-2',
       keys: { p256dh: 'p256dh', auth: 'auth' },
+      timezone: 'America/New_York',
     });
 
     pushService.removeSubscription(otherUserId, 'https://push.example.com/sub-2');
@@ -127,10 +130,12 @@ describe('with VAPID keys configured', () => {
     pushService.saveSubscription(userId, {
       endpoint: 'https://push.example.com/a',
       keys: { p256dh: 'a', auth: 'a' },
+      timezone: 'America/New_York',
     });
     pushService.saveSubscription(userId, {
       endpoint: 'https://push.example.com/b',
       keys: { p256dh: 'b', auth: 'b' },
+      timezone: 'America/New_York',
     });
     sendNotification.mockResolvedValue(undefined);
 
@@ -147,6 +152,7 @@ describe('with VAPID keys configured', () => {
     pushService.saveSubscription(userId, {
       endpoint: 'https://push.example.com/stale',
       keys: { p256dh: 'a', auth: 'a' },
+      timezone: 'America/New_York',
     });
     sendNotification.mockRejectedValueOnce(Object.assign(new Error('Gone'), { statusCode: 410 }));
 
@@ -167,6 +173,7 @@ describe('with VAPID keys configured', () => {
     pushService.saveSubscription(userId, {
       endpoint: 'https://push.example.com/transient',
       keys: { p256dh: 'a', auth: 'a' },
+      timezone: 'America/New_York',
     });
     sendNotification.mockRejectedValueOnce(
       Object.assign(new Error('Server error'), { statusCode: 500 }),

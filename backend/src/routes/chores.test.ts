@@ -4,16 +4,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 
-// Chore mutations fire best-effort push notifications (choreService.ts) — mocked here
-// so these tests assert *that* the right person gets notified without touching the
-// real web-push/VAPID machinery, which is covered separately in pushService.test.ts.
-vi.mock('../services/pushService.js', () => ({
-  notifyUser: vi.fn(),
-  getPublicKey: vi.fn(() => null),
-  saveSubscription: vi.fn(),
-  removeSubscription: vi.fn(),
+// Chore mutations queue debounced push notifications via notificationBatcher.ts —
+// mocked here so these tests assert *that* the right person gets queued (synchronous,
+// within the request) without waiting out the real debounce delay or touching
+// web-push/VAPID, both covered separately (notificationBatcher.test.ts,
+// pushService.test.ts).
+vi.mock('../services/notificationBatcher.js', () => ({
+  queueOverdueNotification: vi.fn(),
+  queueReopenedNotification: vi.fn(),
+  queueAssignmentNotification: vi.fn(),
 }));
-const { notifyUser } = await import('../services/pushService.js');
+const { queueOverdueNotification, queueReopenedNotification, queueAssignmentNotification } =
+  await import('../services/notificationBatcher.js');
 
 const testDir = mkdtempSync(join(tmpdir(), 'chore-tracker-chores-routes-'));
 process.env.DB_FILE = join(testDir, 'test.db');
@@ -423,19 +425,19 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
 
   it('does not notify when a member assigns a chore to themself', async () => {
     const chore = await postChore({ name: 'Fold laundry', zoneIds: [] });
-    vi.mocked(notifyUser).mockClear();
+    vi.mocked(queueAssignmentNotification).mockClear();
 
     await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
       .set('Cookie', member.cookie)
       .send({ userId: memberId });
 
-    expect(notifyUser).not.toHaveBeenCalled();
+    expect(queueAssignmentNotification).not.toHaveBeenCalled();
   });
 
   it('notifies the assignee when someone else assigns them a chore', async () => {
     const chore = await postChore({ name: 'Take out recycling', zoneIds: [] });
-    vi.mocked(notifyUser).mockClear();
+    vi.mocked(queueAssignmentNotification).mockClear();
 
     const response = await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
@@ -443,9 +445,11 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
       .send({ userId: memberId });
 
     expect(response.status).toBe(201);
-    expect(notifyUser).toHaveBeenCalledWith(
+    expect(queueAssignmentNotification).toHaveBeenCalledWith(
       memberId,
-      expect.objectContaining({ body: 'Take out recycling' }),
+      chore.id,
+      null,
+      'Take out recycling',
     );
   });
 
@@ -908,7 +912,7 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
       .set('Cookie', member.cookie)
       .send({ userId: memberId });
-    vi.mocked(notifyUser).mockClear();
+    vi.mocked(queueOverdueNotification).mockClear();
 
     const response = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
@@ -916,7 +920,73 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
       .send({ status: 'overdue' });
 
     expect(response.status).toBe(200);
-    expect(notifyUser).toHaveBeenCalledWith(memberId, expect.objectContaining({ body: 'Clean gutters' }));
+    expect(queueOverdueNotification).toHaveBeenCalledWith(memberId, chore.id, null, 'Clean gutters');
+  });
+
+  it('notifies assigned members when a completed chore is reopened back to to-do', async () => {
+    const chore = await postChore({ name: 'Water plants', zoneIds: [] });
+    const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
+      .user.id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId });
+    await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'complete' });
+    vi.mocked(queueReopenedNotification).mockClear();
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'to-do' });
+
+    expect(response.status).toBe(200);
+    expect(queueReopenedNotification).toHaveBeenCalledWith(memberId, chore.id, null, 'Water plants');
+  });
+
+  it('does not notify on a fresh to-do chore (only on complete-to-to-do transitions)', async () => {
+    const chore = await postChore({ name: 'Sweep porch', zoneIds: [] });
+    const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
+      .user.id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId });
+    vi.mocked(queueReopenedNotification).mockClear();
+
+    // Already 'to-do' — setting it to 'to-do' again is not a completion→reopen.
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'to-do' });
+
+    expect(response.status).toBe(200);
+    expect(queueReopenedNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not notify the member who reopens their own chore', async () => {
+    const chore = await postChore({ name: 'Fold towels', zoneIds: [] });
+    const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
+      .user.id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId });
+    await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'complete' });
+    vi.mocked(queueReopenedNotification).mockClear();
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'to-do' });
+
+    expect(response.status).toBe(200);
+    expect(queueReopenedNotification).not.toHaveBeenCalled();
   });
 
   it('rejects a member marking a chore overdue with 403', async () => {
@@ -1066,20 +1136,19 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
     const chore = await postChore({ name: 'Descale kettle', zoneIds: [kitchenZoneId, bathroomZoneId] });
     const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
       .user.id;
-    const headId = (await request(app).get('/api/auth/me').set('Cookie', head.cookie)).body.user
-      .id;
+    const otherMember = await registerAndJoin('zonestatus-member-2@example.com', head);
     // Zone-scoped assignment to the zone being marked overdue...
     await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
       .set('Cookie', member.cookie)
       .send({ userId: memberId, zoneId: kitchenZoneId });
-    // ...and a whole-chore assignment to the head, who should also be notified since
-    // a whole-chore assignment covers every one of its zones.
+    // ...and a whole-chore assignment to someone else, who should also be notified
+    // since a whole-chore assignment covers every one of its zones.
     await request(app)
       .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
       .set('Cookie', head.cookie)
-      .send({ userId: headId });
-    vi.mocked(notifyUser).mockClear();
+      .send({ userId: otherMember.userId });
+    vi.mocked(queueOverdueNotification).mockClear();
 
     const response = await request(app)
       .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
@@ -1087,8 +1156,55 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
       .send({ status: 'overdue' });
 
     expect(response.status).toBe(200);
-    const notifiedUserIds = vi.mocked(notifyUser).mock.calls.map((call) => call[0]);
-    expect(new Set(notifiedUserIds)).toEqual(new Set([memberId, headId]));
+    const notifiedUserIds = vi.mocked(queueOverdueNotification).mock.calls.map((call) => call[0]);
+    expect(new Set(notifiedUserIds)).toEqual(new Set([memberId, otherMember.userId]));
+  });
+
+  it('does not notify the head who marks their own assigned zone overdue', async () => {
+    const chore = await postChore({ name: 'Wipe mirrors', zoneIds: [kitchenZoneId] });
+    const headId = (await request(app).get('/api/auth/me').set('Cookie', head.cookie)).body.user
+      .id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', head.cookie)
+      .send({ userId: headId, zoneId: kitchenZoneId });
+    vi.mocked(queueOverdueNotification).mockClear();
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(200);
+    expect(queueOverdueNotification).not.toHaveBeenCalled();
+  });
+
+  it('notifies assigned members when a completed zone is reopened back to to-do', async () => {
+    const chore = await postChore({ name: 'Restock towels', zoneIds: [kitchenZoneId] });
+    const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
+      .user.id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId, zoneId: kitchenZoneId });
+    await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', member.cookie)
+      .send({ status: 'complete' });
+    vi.mocked(queueReopenedNotification).mockClear();
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'to-do' });
+
+    expect(response.status).toBe(200);
+    expect(queueReopenedNotification).toHaveBeenCalledWith(
+      memberId,
+      chore.id,
+      kitchenZoneId,
+      'Restock towels',
+    );
   });
 
   it('rejects a member marking a chore’s zone overdue with 403', async () => {

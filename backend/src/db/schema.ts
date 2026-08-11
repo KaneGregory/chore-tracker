@@ -133,5 +133,16 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
   endpoint: text('endpoint').notNull().unique(),
   p256dh: text('p256dh').notNull(),
   auth: text('auth').notNull(),
+  // IANA zone (e.g. "America/New_York"), captured client-side at subscribe time —
+  // drives the daily reminder's "9am in the user's timezone" check
+  // (dailyReminderScheduler.ts). Null for subscriptions created before that feature
+  // existed; such subscriptions are simply skipped until the client resyncs (see
+  // NotificationOptIn.tsx, which does this silently on every load).
+  timezone: text('timezone'),
+  // The last time this subscription was checked for the daily reminder, used to
+  // ensure at most one check per local calendar day — not "last time a reminder was
+  // actually sent," since a day with zero outstanding chores must still count as
+  // checked, or the next run would just check (and likely skip) it again.
+  lastDailyReminderAt: integer('last_daily_reminder_at'),
   createdAt: integer('created_at').notNull(),
 });

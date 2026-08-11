@@ -209,12 +209,8 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   including the cloud metadata IP) before it's ever stored, rather than trusting
   whatever a client POSTs — otherwise any authenticated household member could turn
   the server into a blind SSRF proxy against internal services via their own
-  subscription. Since chores have no
-  due-date column and `'overdue'` is only ever set manually (see below), the only two
-  trigger points are `choreService.assignChore` (assigning to someone other than
-  yourself) and `setChoreStatus`/`setChoreZoneStatus` (transitioning to `'overdue'`,
-  notifying every assignee of that chore/zone — a whole-chore assignment,
-  `zoneId IS NULL`, counts as covering every one of its zones too). Frontend:
+  subscription. Trigger points and delivery are described in the next bullet.
+  Frontend:
   `vite-plugin-pwa`'s strategy is `injectManifest` (`frontend/src/sw.ts`), not the
   default `generateSW` — this was a deliberate reversal of the original, smaller-diff
   design (bolting the push listeners onto a `generateSW` output via Workbox's
@@ -236,6 +232,67 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   either). `frontend/src/utils/push.ts` fetches the VAPID public key from the backend
   at runtime (`GET /api/push/public-key`) rather than duplicating it into a frontend
   build-time env var, so there's one source of truth.
+* Notifications are debounced and re-verified, not sent the instant a trigger fires.
+  `backend/src/services/notificationBatcher.ts` keeps one in-memory, per-recipient
+  pending-item queue with a single debounce timer (`BATCH_DELAY_MS`, currently 2
+  minutes — a deliberately chosen default, not something asked for at a specific
+  value, easy to retune): any new event for that same recipient clears and restarts
+  the timer, so a burst of related edits (e.g. a head reviewing several chores in a
+  row) coalesces into one notification instead of several. At flush, every queued
+  item is re-checked against *current* DB state, not the state at queue time — an
+  item queued as `'overdue'` that's since been marked complete is simply dropped, and
+  if nothing survives, no notification is sent at all. Surviving items are deduped by
+  `(type, choreId, zoneId)` and combined into either the existing single-item
+  phrasing (one survivor) or a joined digest (more than one) — see
+  `SINGLE_ITEM_TITLE`/`ITEM_DESCRIPTION`/`buildPayload`. Only `pushService.notifyUser`
+  is called from the batcher; nothing else in the codebase should call it directly
+  for a chore-triggered notification. Three item types feed the same queue, each
+  queued only for users other than whoever performed the action — a user is never
+  notified about their own change, enforced once in `choreService.notifyAssignees`
+  (`userIds.delete(requestingUserId)`) rather than at each call site:
+  - `queueAssignmentNotification` — `choreService.assignChore`, unchanged from
+    before, re-validated at flush against whether the assignment (matched by
+    `choreId`/`zoneId`/`userId`, not the original assignment row's id, since
+    unassigning and reassigning the same target is indistinguishable from the
+    recipient's point of view) still exists.
+  - `queueOverdueNotification` — `setChoreStatus`/`setChoreZoneStatus` transitioning
+    to `'overdue'`, re-validated against whether that chore/zone is still `'overdue'`.
+  - `queueReopenedNotification` — the same two functions transitioning specifically
+    from `'complete'` back to `'to-do'` (captured as `previousStatus` before the
+    `UPDATE`) — re-validated against whether it's still `'to-do'`. A bare
+    to-do→to-do PATCH (already to-do, set to to-do again) is not a reopen and queues
+    nothing; nor is `'overdue'`→`'to-do'`, which the UI has no button for anyway (see
+    `ChoreStatusActions.tsx`) — only complete→to-do counts, per what was asked.
+  On top of these event-driven notifications, `backend/src/services/
+  dailyReminderScheduler.ts` sends an independent once-a-day reminder — not routed
+  through the batcher at all, since it's not tied to any single trigger event.
+  `checkDailyReminders(now)` takes its clock as a parameter specifically so it's
+  directly testable without waiting on real timers; `startDailyReminderScheduler()`
+  (a plain `setInterval`, polled once a minute — no cron dependency added for
+  something this simple) is called only from `index.ts`, never from `createApp()`,
+  so no test spins up a real recurring interval. `push_subscriptions.timezone` (IANA
+  string, e.g. `"America/New_York"`, nullable — migration `0012`, alongside
+  `lastDailyReminderAt`) is captured client-side via
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` (the server has no other way to
+  know it), validated on `POST /api/push/subscribe` by attempting to construct an
+  `Intl.DateTimeFormat` with it and catching the `RangeError` — the standard way to
+  validate an IANA zone name without hardcoding/maintaining a list. Subscriptions
+  from before this feature existed have `timezone: null` and are simply skipped by
+  the scheduler until refreshed; `NotificationOptIn.tsx` resyncs it silently (best
+  effort, swallowing errors) on every mount whenever a subscription already exists,
+  so this self-heals without requiring anyone to explicitly re-opt-in. The reminder
+  fires once per *local calendar day* per subscription (not per user — a user with
+  devices in two different timezones gets checked, and can be notified, once per
+  device, independently, a known accepted limitation) at local hour 9 fixed
+  (`REMINDER_HOUR`) — not yet configurable, per what was asked ("for now... later this
+  could be configurable"). `lastDailyReminderAt` is updated on every check regardless
+  of whether anything was actually sent — it means "already checked today," not
+  "already notified today," since a day with zero outstanding chores must still
+  count as handled or the very next minute's tick would just check it again.
+  `dailyReminderScheduler.ts` calls `pushService.notifyOneSubscription` (sends to
+  exactly the one device being checked), never `notifyUser` (which would fan out to
+  every device the user owns, wrongly re-notifying devices already handled at their
+  own local 9am).
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
   for installability (manifest + service worker) and for the push service worker
@@ -359,12 +416,18 @@ Run from within `backend/` or `frontend/` unless noted:
   anything richer (filtering by zone, editing) is future work, along with computing
   `'overdue'` automatically from due dates once those exist (it's manually
   head-settable in the meantime — see the chores bullet in Architectural decisions).
-* Push notifications only fire on chore assignment and on a head manually marking a
-  chore/zone overdue — there's no due-date-based reminder yet, since chores don't
-  have due dates (see above). No retry/backoff beyond a single best-effort send
-  attempt, either: a transient push-service outage just means that notification is
-  missed, not queued for later. Real-device (Android/iOS) push testing requires HTTPS
-  (the Push API treats `localhost` as secure but nothing else non-HTTPS) — not set up,
+* Push notifications fire on assignment, on a head manually marking a chore/zone
+  overdue, on reopening a completed chore/zone back to to-do, and once a day per
+  device at a fixed local hour if anything's still outstanding — see the batching/
+  daily-scheduler bullet above. Still no genuine due-date-based reminder, since
+  chores don't have due dates at all (see above) — the daily digest is a fixed-time
+  substitute, not that. No retry/backoff beyond a single best-effort send attempt: a
+  transient push-service outage just means that notification is missed, not queued
+  for later (this applies per notification, batched or not — the batcher only
+  protects against redundant/stale sends, not delivery failures). The 9am reminder
+  hour and the ~2-minute batch delay are both fixed constants, not configurable by a
+  household or user yet. Real-device (Android/iOS) push testing requires HTTPS (the
+  Push API treats `localhost` as secure but nothing else non-HTTPS) — not set up,
   same deferred status as installing the PWA on a real phone.
 
 Fixed during the UI pass: the household's join code was generated and stored but
