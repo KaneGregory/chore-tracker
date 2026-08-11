@@ -22,6 +22,12 @@ export function createApp() {
   app.use(cookieParser());
   app.use(express.json({ limit: '10kb' }));
 
+  // Unauthenticated liveness check for the hosting platform (e.g. Render) to poll —
+  // deliberately does nothing beyond confirming the process is up and responding.
+  app.get('/health', (_req, res) => {
+    res.status(200).send('ok');
+  });
+
   app.use('/api/auth', authRouter);
   app.use('/api/households', householdsRouter);
   app.use('/api/households', zonesRouter);

@@ -1,0 +1,65 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Two services, matching this repo's existing separate frontend/backend
+# architecture (CORS between them, not one server serving both):
+#   - chore-tracker-backend:  Node API + SQLite, on a paid plan so it can have a
+#     persistent disk (the free web-service tier has no disk — the SQLite file
+#     would be wiped on every restart/deploy).
+#   - chore-tracker-frontend: static Vite build, Render's free static-site tier.
+#
+# CORS_ORIGIN and VITE_API_BASE_URL below are hardcoded to each other's public
+# onrender.com URL, derived from the `name:` fields — Render's `fromService` only
+# exposes the *private*-network hostname (unreachable from a user's browser), not
+# a public URL, so there's no way to wire these automatically. If you rename either
+# service, update the other service's matching env var to match.
+services:
+  - name: chore-tracker-backend
+    type: web
+    runtime: node
+    rootDir: ./backend
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: DB_FILE
+        value: /data/chore-tracker.db
+      - key: CORS_ORIGIN
+        value: https://chore-tracker-frontend.onrender.com
+      - key: SESSION_TTL_DAYS
+        value: '30'
+      # Set these three manually in the Render dashboard after the first deploy —
+      # generate with `npx web-push generate-vapid-keys` (see backend/.env.example).
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+
+  - name: chore-tracker-frontend
+    type: web
+    runtime: static
+    rootDir: ./frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://chore-tracker-backend.onrender.com
+    routes:
+      # SPA fallback: react-router handles paths like /households/1/zones
+      # client-side, but a direct load/refresh of that URL has no matching static
+      # file — Render tries an exact file match first and only falls back to this
+      # rewrite when none exists, so real assets (JS/CSS/icons) are unaffected.
+      - type: rewrite
+        source: /<path>
+        destination: /index.html

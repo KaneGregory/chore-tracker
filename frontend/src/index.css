@@ -795,11 +795,15 @@ fieldset.form-field legend,
   margin-top: 10px;
 }
 
-.chore-card.status-complete .chore-status-actions .btn-pill-outline {
+/* Scoped to .chore-status-row (only ever set on the whole-chore, zoneless status
+   actions — see ChoreRow.tsx), not the shared .chore-status-actions class, so this
+   can't outrank a zone's own .chore-zone-section.status-* rule below regardless of
+   the parent chore card's overall derived status. */
+.chore-card.status-complete .chore-status-row .btn-pill-outline {
   border-color: color-mix(in srgb, var(--accent-2) 50%, var(--line));
 }
 
-.chore-card.status-overdue .chore-status-actions .btn-pill-outline {
+.chore-card.status-overdue .chore-status-row .btn-pill-outline {
   border-color: color-mix(in srgb, var(--error) 50%, var(--line));
 }
 

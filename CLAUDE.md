@@ -244,6 +244,32 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   backend refuses to start without `CORS_ORIGIN` set, because the `cors` package
   treats a falsy `origin` as `*`, which combined with `credentials: true` is a
   fail-open misconfiguration.
+* Deployment target is Render (`render.yaml` at repo root — a Blueprint, not manual
+  dashboard clicking), as two services matching the existing separate frontend/backend
+  architecture rather than one server serving both: `chore-tracker-backend` (Node web
+  service) and `chore-tracker-frontend` (static site). The backend is on a paid plan
+  specifically for its persistent disk (`/data`, holding the SQLite file via `DB_FILE`)
+  — Render's free web-service tier has no disk, which would silently wipe the database
+  on every restart/deploy. `CORS_ORIGIN`/`VITE_API_BASE_URL` are hardcoded to each
+  other's public `onrender.com` URL (derived from the fixed `name:` fields in
+  `render.yaml`) rather than wired via Render's `fromService` — that only exposes a
+  service's *private*-network hostname, unreachable from a user's browser, so there's
+  no way to get a public URL that way; renaming either service means updating the
+  other's matching env var by hand. `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/
+  `VAPID_SUBJECT` are `sync: false` in the blueprint (set manually in the Render
+  dashboard after first deploy, never committed). `GET /health` (`app.ts`) is an
+  unauthenticated liveness check that does nothing beyond confirming the process is up
+  — it exists for Render's `healthCheckPath` polling, not general app use.
+  Deploying this way surfaced a real bug worth remembering: session cookies were
+  `sameSite: 'lax'` unconditionally (`backend/src/constants.ts`), which happened to
+  work in dev only because `localhost:5173`/`localhost:3001` differ by port, not by
+  site — `SameSite` policy ignores port. On Render, the frontend and backend live on
+  different subdomains of `onrender.com`, which is itself in the Public Suffix List
+  (deliberately, so different Render services get separate cookie/storage
+  boundaries) — making them genuinely cross-site, where `Lax` cookies are dropped
+  from the frontend's `fetch()` calls entirely. Fixed by switching to
+  `sameSite: 'none'` (paired with `secure`, required by browsers for `SameSite=None`)
+  whenever `NODE_ENV === 'production'`, same pattern already used for `secure`.
 * Visual design system lives entirely in `frontend/src/index.css` as CSS custom
   properties on `:root` (palette, type, radius, shadow), with light/dark variants
   under `@media (prefers-color-scheme: dark)`. Don't hardcode colors or fonts in
