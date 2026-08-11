@@ -1,9 +1,9 @@
 @font-face {
-  font-family: 'Fredoka';
+  font-family: 'Caveat';
   font-style: normal;
-  font-weight: 300 700;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/fredoka-variable.woff2') format('woff2');
+  src: url('/fonts/caveat-variable.woff2') format('woff2');
 }
 
 :root {
@@ -21,7 +21,7 @@
   --line: #ebddb8;
   --error: #d64545;
 
-  --font-display: 'Fredoka', system-ui, sans-serif;
+  --font-display: 'Caveat', system-ui, sans-serif;
   --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -68,13 +68,17 @@ body {
 h1,
 h2 {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 4px;
   line-height: 1.15;
 }
 
 h1 {
-  font-size: clamp(1.7rem, 6vw, 2.2rem);
+  font-size: clamp(2.1rem, 7vw, 2.7rem);
+}
+
+h2 {
+  font-size: 1.6rem;
 }
 
 p {
@@ -107,8 +111,8 @@ a {
   align-items: center;
   gap: 8px;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.25rem;
+  font-weight: 700;
+  font-size: 1.5rem;
 }
 
 .logo-mark {
@@ -777,8 +781,9 @@ fieldset.form-field legend,
 }
 
 .chore-name {
-  font-weight: 600;
-  font-size: 0.92rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
 }
 
 .chore-assignees {
@@ -881,8 +886,9 @@ fieldset.form-field legend,
 }
 
 .chore-zone-name {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
 }
 
 .chore-zone-summary {
@@ -953,12 +959,13 @@ fieldset.form-field legend,
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--ink);
   background: color-mix(in srgb, var(--accent-2) 20%, transparent);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   white-space: nowrap;
 }
 
@@ -972,6 +979,7 @@ fieldset.form-field legend,
   border-radius: 50%;
   background: none;
   color: inherit;
+  font-family: var(--font-body);
   font-size: 0.8rem;
   line-height: 1;
   padding: 0;

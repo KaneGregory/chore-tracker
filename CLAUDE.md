@@ -340,10 +340,32 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   under `@media (prefers-color-scheme: dark)`. Don't hardcode colors or fonts in
   component files — reference the tokens (`var(--accent)`, `var(--font-display)`,
   etc.) so a future palette/type change is a one-file edit. The display face
-  (`Fredoka`) is self-hosted at `frontend/public/fonts/` — not loaded from a CDN —
-  so it works offline once the service worker has precached it; it's included in
-  `vite.config.ts`'s `workbox.globPatterns` for that reason, don't drop `woff2` from
-  that list.
+  (`Caveat`, a casual handwritten script — chosen to match the "fridge-note" palette
+  comment already in `:root`, after feedback that the original `Fredoka` read as too
+  generic/geometric for that theme) is self-hosted at `frontend/public/fonts/` — not
+  loaded from a CDN — so it works offline once the service worker has precached it;
+  it's included in `vite.config.ts`'s `workbox.globPatterns` for that reason, don't
+  drop `woff2` from that list. Used for `h1`/`h2`/`.logo` (page titles, the header
+  logo) and — the actual point of the feedback that prompted this: everything that
+  reads as handwritten content on a "sticky note" rather than UI chrome around it —
+  each chore/zone's own name (`.chore-name`, `.chore-zone-name`) and each assignee's
+  name (`.assignee-chip`, the little pill showing who a chore/zone is assigned to).
+  `.chip-remove` (the `×` button inside an `.assignee-chip`) deliberately overrides
+  back to `--font-body` rather than inheriting the chip's handwritten face — it's a
+  tap target/symbol, not note content, and a cursive "×" reads worse as a button.
+  Everything else (badges, buttons, body copy) stays `--font-body` (system sans), so
+  it's easy to try another display face later by swapping the one
+  `@font-face`/`--font-display` pair plus these selectors' sizing, without touching
+  component code, per the "reference the tokens" rule above. Script faces read
+  lighter/smaller than a geometric sans at the same pixel size, so every one of these
+  selectors also got a weight bump to 700 (from Fredoka's 600) and a size bump to
+  stay legible — `h1` `clamp(1.7rem,6vw,2.2rem)` → `clamp(2.1rem,7vw,2.7rem)`,
+  `.logo` `1.25rem` → `1.5rem`, `h2` now explicit at `1.6rem` rather than the browser
+  default, `.chore-name` `0.92rem` → `1.3rem`, `.chore-zone-name` `0.85rem` →
+  `1.1rem`, `.assignee-chip` `0.72rem` → `1rem` (padding nudged up too, `2px 8px` →
+  `3px 10px`, so the bigger text doesn't look cramped in the pill) — if a future
+  display-face swap goes back to a geometric/sans-serif face, reconsider all of these
+  bumps too, they were tuned for Caveat specifically.
 
 ## All code should be
 
