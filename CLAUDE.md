@@ -259,7 +259,15 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   `VAPID_SUBJECT` are `sync: false` in the blueprint (set manually in the Render
   dashboard after first deploy, never committed). `GET /health` (`app.ts`) is an
   unauthenticated liveness check that does nothing beyond confirming the process is up
-  — it exists for Render's `healthCheckPath` polling, not general app use.
+  — it exists for Render's `healthCheckPath` polling, not general app use. Both
+  services' `buildCommand`s use `npm install --include=dev` rather than plain `npm
+  install` — Render sets `NODE_ENV=production` during the build step too (we also set
+  it ourselves, since the cookie logic below needs it at runtime), and npm skips
+  `devDependencies` under that env var by default; without the override, `tsc`/`vite
+  build` fail outright (`typescript`, `@types/*`, and for the backend `vitest`/
+  `supertest` are all devDependencies — confirmed by reproducing Render's exact build
+  command locally with `NODE_ENV=production` set, which fails the same way without
+  `--include=dev` and succeeds with it).
   Deploying this way surfaced a real bug worth remembering: session cookies were
   `sameSite: 'lax'` unconditionally (`backend/src/constants.ts`), which happened to
   work in dev only because `localhost:5173`/`localhost:3001` differ by port, not by
