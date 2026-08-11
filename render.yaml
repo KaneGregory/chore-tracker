@@ -8,10 +8,15 @@
 #   - chore-tracker-frontend: static Vite build, Render's free static-site tier.
 #
 # CORS_ORIGIN and VITE_API_BASE_URL below are hardcoded to each other's public
-# onrender.com URL, derived from the `name:` fields — Render's `fromService` only
-# exposes the *private*-network hostname (unreachable from a user's browser), not
-# a public URL, so there's no way to wire these automatically. If you rename either
-# service, update the other service's matching env var to match.
+# onrender.com URL — Render's `fromService` only exposes the *private*-network
+# hostname (unreachable from a user's browser), not a public URL, so there's no way
+# to wire these automatically. These are NOT reliably derivable from `name:` below:
+# Render only uses the exact name if it's globally available, and silently appends a
+# random suffix on a collision (this happened for real — chore-tracker-backend was
+# taken by an unrelated service, so the real backend is chore-tracker-backend-te1a).
+# After creating/renaming a service, check its actual URL in the Render dashboard and
+# update the OTHER service's env var here to match, then trigger a rebuild (not just
+# a restart — VITE_API_BASE_URL is baked in at frontend build time).
 services:
   - name: chore-tracker-backend
     type: web
@@ -60,7 +65,7 @@ services:
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://chore-tracker-backend.onrender.com
+        value: https://chore-tracker-backend-te1a.onrender.com
     routes:
       # SPA fallback: react-router handles paths like /households/1/zones
       # client-side, but a direct load/refresh of that URL has no matching static
