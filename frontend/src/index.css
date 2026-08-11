@@ -129,17 +129,6 @@ a {
   flex-shrink: 0;
 }
 
-.user-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.user-chip span {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
 .user-menu {
   position: relative;
 }
@@ -151,12 +140,27 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 140px;
+  max-width: min(260px, calc(100vw - 32px));
   background: var(--card);
   border: 2px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
   padding: 6px;
   z-index: 10;
+}
+
+.user-menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+
+.user-menu-identity {
+  padding: 4px 10px 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: default;
+  overflow-wrap: anywhere;
 }
 
 .user-menu-dropdown a,

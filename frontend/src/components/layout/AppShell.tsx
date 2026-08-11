@@ -14,14 +14,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="logo-mark" aria-hidden="true">
             <FontAwesomeIcon icon={faHouseCircleCheck} />
           </span>
-          Chores
+          Chore Tracker
         </span>
-        {state.status === 'authenticated' && (
-          <div className="user-chip">
-            <span>{state.user.email}</span>
-            <UserMenu />
-          </div>
-        )}
+        {state.status === 'authenticated' && <UserMenu />}
       </header>
       <main>{children}</main>
     </div>

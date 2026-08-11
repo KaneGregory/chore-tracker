@@ -75,6 +75,8 @@ export function UserMenu() {
             </>
           )}
           <NotificationOptIn />
+          <div className="user-menu-divider" role="separator" />
+          <span className="user-menu-identity">Logged in as {state.user.email}</span>
           <button role="menuitem" type="button" onClick={() => void handleLogout()}>
             Log out
           </button>

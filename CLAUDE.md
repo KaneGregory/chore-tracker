@@ -70,9 +70,18 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   free text — not validated as a slug), chosen at registration before the household
   step and checked for availability the same way email is (`GET
   /api/auth/username-availability`, mirroring `/email-availability`). It's the
-  display identity everywhere in the app except the header, which still shows email
-  (`AppShell`) — that split is intentional, not an oversight, so don't "fix" it by
-  making the header consistent with everywhere else. There's no rename UI yet.
+  display identity everywhere in the app, including the header — email is only ever
+  shown in one place now: a non-interactive "Logged in as" line (with the email)
+  near the bottom of `UserMenu`'s dropdown (above "Log out", below a
+  `role="separator"`
+  divider), styled and marked up (no `role="menuitem"`, `cursor: default`) to read as
+  informational rather than a clickable option. It used to sit directly in the header
+  (`AppShell`'s `.user-chip`) unconditionally, alongside the username split described
+  above being deliberate — that reasoning didn't change, only the location did: a
+  raw email of arbitrary length in a flex header with no truncation broke small
+  screens, so it moved into the dropdown where `.user-menu-dropdown`'s `max-width:
+  min(260px, calc(100vw - 32px))` and the identity line's `overflow-wrap: anywhere`
+  let it wrap instead of overflowing. There's still no rename UI.
   Migration `0005` was hand-edited from drizzle-kit's generated output to backfill
   pre-existing rows with a `'user-<id>'` placeholder username, since SQLite can't add
   a `NOT NULL` column with no default to a non-empty table — see the comment at the
