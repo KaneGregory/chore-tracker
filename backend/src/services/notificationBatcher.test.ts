@@ -18,7 +18,7 @@ const batcher = await import('./notificationBatcher.js');
 
 runMigrations();
 
-const BATCH_DELAY_MS = 2 * 60 * 1000;
+const BATCH_DELAY_MS = 30 * 1000;
 
 let recipientId: number;
 let choreAId: number;

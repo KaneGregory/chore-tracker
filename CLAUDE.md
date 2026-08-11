@@ -243,9 +243,11 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   build-time env var, so there's one source of truth.
 * Notifications are debounced and re-verified, not sent the instant a trigger fires.
   `backend/src/services/notificationBatcher.ts` keeps one in-memory, per-recipient
-  pending-item queue with a single debounce timer (`BATCH_DELAY_MS`, currently 2
-  minutes — a deliberately chosen default, not something asked for at a specific
-  value, easy to retune): any new event for that same recipient clears and restarts
+  pending-item queue with a single debounce timer (`BATCH_DELAY_MS`, currently 30
+  seconds — originally a deliberately chosen default since no specific value was
+  asked for, then explicitly shortened from an initial 2 minutes as "pointlessly
+  long"; easy to retune again): any new event for that same recipient clears and
+  restarts
   the timer, so a burst of related edits (e.g. a head reviewing several chores in a
   row) coalesces into one notification instead of several. At flush, every queued
   item is re-checked against *current* DB state, not the state at queue time — an
@@ -456,7 +458,7 @@ Run from within `backend/` or `frontend/` unless noted:
   transient push-service outage just means that notification is missed, not queued
   for later (this applies per notification, batched or not — the batcher only
   protects against redundant/stale sends, not delivery failures). The 9am reminder
-  hour and the ~2-minute batch delay are both fixed constants, not configurable by a
+  hour and the 30-second batch delay are both fixed constants, not configurable by a
   household or user yet. Real-device (Android/iOS) push testing requires HTTPS (the
   Push API treats `localhost` as secure but nothing else non-HTTPS) — not set up,
   same deferred status as installing the PWA on a real phone.

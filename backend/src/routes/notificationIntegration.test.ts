@@ -36,7 +36,7 @@ afterAll(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
-const BATCH_DELAY_MS = 2 * 60 * 1000;
+const BATCH_DELAY_MS = 30 * 1000;
 
 function cookieFrom(response: request.Response): string {
   const setCookie = response.headers['set-cookie'];

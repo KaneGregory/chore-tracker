@@ -7,7 +7,7 @@ import { notifyUser } from './pushService.js';
 // burst of related edits (e.g. a head reviewing several chores in a row) into one
 // notification instead of a flurry of them, short enough to still feel timely.
 // Nothing else depends on this value; retune freely.
-const BATCH_DELAY_MS = 2 * 60 * 1000;
+const BATCH_DELAY_MS = 30 * 1000;
 
 type PendingItemType = 'overdue' | 'reopened' | 'assigned';
 
