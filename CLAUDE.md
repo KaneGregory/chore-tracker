@@ -188,9 +188,58 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   `ChoreStatusActions` component (`frontend/src/components/household/`) is the single
   place that decides which status buttons render for a given status/role — reuse it
   rather than duplicating the to-do/complete/overdue button logic elsewhere.
+* Web Push notifies a user even when the app isn't open, using the standard Push API
+  (VAPID), not a third-party notification service. `push_subscriptions`
+  (`user_id, endpoint, p256dh, auth`, migration `0011`) holds one row per
+  browser/device a user has enabled notifications on — no uniqueness on `userId`
+  alone, only on `endpoint`. `backend/src/services/pushService.ts` reads
+  `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` lazily (per call, not at
+  import time) rather than failing startup like `CORS_ORIGIN` does — push is an
+  enhancement, not core request handling, so a dev without keys configured just gets
+  a console warning and a no-op `notifyUser` instead of losing the rest of the app.
+  `notifyUser` is best-effort and never awaited by callers: a dead subscription or
+  push-service outage must never break the chore mutation that triggered it. A
+  404/410 response means the browser discarded that subscription, so the row is
+  deleted right there rather than needing a separate sweep job. `notifyUser` later
+  makes a real outbound HTTP request to whatever `endpoint` a subscription was saved
+  with, on a trigger an ordinary member can pull themselves (e.g. a head marking their
+  own assigned chore overdue) — so `POST /api/push/subscribe`
+  (`backend/src/validation/pushSchemas.ts`) rejects any endpoint that isn't a public
+  `https://` host (blocking `localhost`/loopback/RFC1918/link-local addresses,
+  including the cloud metadata IP) before it's ever stored, rather than trusting
+  whatever a client POSTs — otherwise any authenticated household member could turn
+  the server into a blind SSRF proxy against internal services via their own
+  subscription. Since chores have no
+  due-date column and `'overdue'` is only ever set manually (see below), the only two
+  trigger points are `choreService.assignChore` (assigning to someone other than
+  yourself) and `setChoreStatus`/`setChoreZoneStatus` (transitioning to `'overdue'`,
+  notifying every assignee of that chore/zone — a whole-chore assignment,
+  `zoneId IS NULL`, counts as covering every one of its zones too). Frontend:
+  `vite-plugin-pwa`'s strategy is `injectManifest` (`frontend/src/sw.ts`), not the
+  default `generateSW` — this was a deliberate reversal of the original, smaller-diff
+  design (bolting the push listeners onto a `generateSW` output via Workbox's
+  `importScripts`), because `generateSW`'s dev-mode service worker is always a
+  stripped-down placeholder with no way to add custom event listeners, so push could
+  never be tested under plain `vite dev`/`dev:ai`, only after a full `vite build` +
+  `vite preview` — confirmed by literally inspecting the served dev `sw.js` and
+  finding no `push` listener in it. `injectManifest` + `devOptions.enabled: true`
+  serves the real `src/sw.ts` (transpiled) even under the dev server, so `dev:ai` is
+  sufficient for manual testing again. `src/sw.ts` needs `lib: ["ES2023",
+  "WebWorker"]`, incompatible with the rest of the app's DOM-based
+  `tsconfig.app.json` — it has its own `tsconfig.sw.json` (referenced from the root
+  `tsconfig.json`), and is excluded from `tsconfig.app.json`'s `include`. Don't
+  reintroduce a `frontend/public/push-sw.js`-style static file; the service worker's
+  full source (precaching, the SPA navigation fallback, and the push/notificationclick
+  listeners) lives in `sw.ts` itself, built via `workbox-core`/`workbox-precaching`/
+  `workbox-routing` (added as direct devDependencies, versions pinned to match
+  `vite-plugin-pwa`'s own bundled `workbox-build` version — check that when bumping
+  either). `frontend/src/utils/push.ts` fetches the VAPID public key from the backend
+  at runtime (`GET /api/push/public-key`) rather than duplicating it into a frontend
+  build-time env var, so there's one source of truth.
 * Frontend: Vite + React + TypeScript, `react-router` (not `react-router-dom` — v8
   merged the two packages; import from `react-router`) for routing, `vite-plugin-pwa`
-  for installability (manifest + service worker).
+  for installability (manifest + service worker) and for the push service worker
+  above.
 * Fail fast on missing required config rather than degrading silently — e.g. the
   backend refuses to start without `CORS_ORIGIN` set, because the `cors` package
   treats a falsy `origin` as `*`, which combined with `credentials: true` is a
@@ -276,6 +325,13 @@ Run from within `backend/` or `frontend/` unless noted:
   anything richer (filtering by zone, editing) is future work, along with computing
   `'overdue'` automatically from due dates once those exist (it's manually
   head-settable in the meantime — see the chores bullet in Architectural decisions).
+* Push notifications only fire on chore assignment and on a head manually marking a
+  chore/zone overdue — there's no due-date-based reminder yet, since chores don't
+  have due dates (see above). No retry/backoff beyond a single best-effort send
+  attempt, either: a transient push-service outage just means that notification is
+  missed, not queued for later. Real-device (Android/iOS) push testing requires HTTPS
+  (the Push API treats `localhost` as secure but nothing else non-HTTPS) — not set up,
+  same deferred status as installing the PWA on a real phone.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a

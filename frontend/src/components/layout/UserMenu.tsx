@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../../context/AuthContext';
+import { NotificationOptIn } from '../notifications/NotificationOptIn';
 
 export function UserMenu() {
   const { state, logout } = useAuth();
@@ -73,6 +74,7 @@ export function UserMenu() {
               </Link>
             </>
           )}
+          <NotificationOptIn />
           <button role="menuitem" type="button" onClick={() => void handleLogout()}>
             Log out
           </button>

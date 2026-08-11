@@ -8,8 +8,19 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      workbox: {
+      // injectManifest (not generateSW) so push/notificationclick listeners live in
+      // our own src/sw.ts — generateSW's dev-mode service worker is a stripped-down
+      // placeholder with no way to add custom listeners, so push could never be
+      // tested under plain `vite dev`/`dev:ai`, only after a full build + preview.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module',
       },
       manifest: {
         name: 'Chore Tracker',

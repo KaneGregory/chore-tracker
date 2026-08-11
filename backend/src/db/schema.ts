@@ -121,3 +121,17 @@ export const sessions = sqliteTable('sessions', {
   createdAt: integer('created_at').notNull(),
   expiresAt: integer('expires_at').notNull(),
 });
+
+// A user can have several rows here (one per browser/device they've enabled
+// notifications on) — no uniqueness on userId alone, only on endpoint, since a given
+// browser subscription is globally unique.
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: integer('created_at').notNull(),
+});

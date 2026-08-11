@@ -177,6 +177,13 @@ a {
   background: var(--paper);
 }
 
+.notification-opt-in-error {
+  display: block;
+  padding: 0 10px 6px;
+  font-size: 0.75rem;
+  color: var(--error);
+}
+
 /* ---------- card (the "taped note" signature) ---------- */
 
 .card {

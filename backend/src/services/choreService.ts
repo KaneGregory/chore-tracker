@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { choreAssignments, chores, choreZones, users, zones } from '../db/schema.js';
 import type { ChoreStatus } from '../db/schema.js';
@@ -15,6 +15,7 @@ import {
   ZoneNotFoundError,
 } from '../errors.js';
 import { getMembership, requireHeadMembership, requireMembership } from './membershipAuth.js';
+import { notifyUser } from './pushService.js';
 
 export interface ChoreAssignmentSummary {
   id: number;
@@ -54,6 +55,30 @@ function deriveChoreStatus(ownStatus: ChoreStatus, zoneStatuses: ChoreStatus[]):
   return zoneStatuses.reduce((lowest, status) =>
     STATUS_RANK[status] < STATUS_RANK[lowest] ? status : lowest,
   );
+}
+
+// Assignees to notify when a chore/zone goes overdue: anyone assigned directly to
+// that zone, plus anyone assigned to the whole chore (zoneId IS NULL applies across
+// all of its zones) — same "whole chore vs. one zone" split the schema documents for
+// choreAssignments.zoneId.
+function notifyAssigneesOverdue(choreId: number, zoneId: number | null, choreName: string): void {
+  const assignments = db
+    .select({ userId: choreAssignments.userId })
+    .from(choreAssignments)
+    .where(
+      zoneId === null
+        ? eq(choreAssignments.choreId, choreId)
+        : and(
+            eq(choreAssignments.choreId, choreId),
+            or(isNull(choreAssignments.zoneId), eq(choreAssignments.zoneId, zoneId)),
+          ),
+    )
+    .all();
+
+  const userIds = new Set(assignments.map((row) => row.userId));
+  for (const userId of userIds) {
+    notifyUser(userId, { title: 'Chore overdue', body: choreName, url: '/' });
+  }
 }
 
 function findChoreInHousehold(householdId: number, choreId: number): ChoreRow | undefined {
@@ -253,6 +278,10 @@ export function assignChore(
     tx.insert(choreAssignments).values({ choreId, zoneId, userId: assigneeUserId, createdAt: now }).run();
   });
 
+  if (assigneeUserId !== requestingUserId) {
+    notifyUser(assigneeUserId, { title: 'New chore assigned', body: chore.name, url: '/' });
+  }
+
   return attachDetailsToOne(chore);
 }
 
@@ -304,6 +333,10 @@ export function setChoreStatus(
 
   db.update(chores).set({ status }).where(eq(chores.id, choreId)).run();
 
+  if (status === 'overdue') {
+    notifyAssigneesOverdue(choreId, null, chore.name);
+  }
+
   return attachDetailsToOne({ ...chore, status });
 }
 
@@ -328,6 +361,10 @@ export function setChoreZoneStatus(
   if (!link) throw new ChoreZoneMismatchError();
 
   db.update(choreZones).set({ status }).where(eq(choreZones.id, link.id)).run();
+
+  if (status === 'overdue') {
+    notifyAssigneesOverdue(choreId, zoneId, chore.name);
+  }
 
   return attachDetailsToOne(chore);
 }

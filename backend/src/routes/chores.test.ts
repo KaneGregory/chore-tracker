@@ -1,8 +1,19 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+
+// Chore mutations fire best-effort push notifications (choreService.ts) — mocked here
+// so these tests assert *that* the right person gets notified without touching the
+// real web-push/VAPID machinery, which is covered separately in pushService.test.ts.
+vi.mock('../services/pushService.js', () => ({
+  notifyUser: vi.fn(),
+  getPublicKey: vi.fn(() => null),
+  saveSubscription: vi.fn(),
+  removeSubscription: vi.fn(),
+}));
+const { notifyUser } = await import('../services/pushService.js');
 
 const testDir = mkdtempSync(join(tmpdir(), 'chore-tracker-chores-routes-'));
 process.env.DB_FILE = join(testDir, 'test.db');
@@ -408,6 +419,34 @@ describe('POST /api/households/:householdId/chores/:choreId/assignments', () => 
         zoneId: null,
       },
     ]);
+  });
+
+  it('does not notify when a member assigns a chore to themself', async () => {
+    const chore = await postChore({ name: 'Fold laundry', zoneIds: [] });
+    vi.mocked(notifyUser).mockClear();
+
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId });
+
+    expect(notifyUser).not.toHaveBeenCalled();
+  });
+
+  it('notifies the assignee when someone else assigns them a chore', async () => {
+    const chore = await postChore({ name: 'Take out recycling', zoneIds: [] });
+    vi.mocked(notifyUser).mockClear();
+
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', head.cookie)
+      .send({ userId: memberId });
+
+    expect(response.status).toBe(201);
+    expect(notifyUser).toHaveBeenCalledWith(
+      memberId,
+      expect.objectContaining({ body: 'Take out recycling' }),
+    );
   });
 
   it('lets a head assign a chore to an account-less member, exactly like any other member', async () => {
@@ -861,6 +900,25 @@ describe('PATCH /api/households/:householdId/chores/:choreId/status', () => {
     expect(response.body.chore.status).toBe('overdue');
   });
 
+  it('notifies assigned members when a chore becomes overdue', async () => {
+    const chore = await postChore({ name: 'Clean gutters', zoneIds: [] });
+    const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
+      .user.id;
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId });
+    vi.mocked(notifyUser).mockClear();
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(200);
+    expect(notifyUser).toHaveBeenCalledWith(memberId, expect.objectContaining({ body: 'Clean gutters' }));
+  });
+
   it('rejects a member marking a chore overdue with 403', async () => {
     const chore = await postChore({ name: 'Empty dishwasher', zoneIds: [] });
 
@@ -1002,6 +1060,35 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
 
     expect(response.status).toBe(200);
     expect(response.body.chore.zones).toEqual([{ zoneId: kitchenZoneId, status: 'overdue' }]);
+  });
+
+  it('notifies members assigned to that zone (and to the whole chore) when it becomes overdue', async () => {
+    const chore = await postChore({ name: 'Descale kettle', zoneIds: [kitchenZoneId, bathroomZoneId] });
+    const memberId = (await request(app).get('/api/auth/me').set('Cookie', member.cookie)).body
+      .user.id;
+    const headId = (await request(app).get('/api/auth/me').set('Cookie', head.cookie)).body.user
+      .id;
+    // Zone-scoped assignment to the zone being marked overdue...
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', member.cookie)
+      .send({ userId: memberId, zoneId: kitchenZoneId });
+    // ...and a whole-chore assignment to the head, who should also be notified since
+    // a whole-chore assignment covers every one of its zones.
+    await request(app)
+      .post(`/api/households/${head.householdId}/chores/${chore.id}/assignments`)
+      .set('Cookie', head.cookie)
+      .send({ userId: headId });
+    vi.mocked(notifyUser).mockClear();
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/chores/${chore.id}/zones/${kitchenZoneId}/status`)
+      .set('Cookie', head.cookie)
+      .send({ status: 'overdue' });
+
+    expect(response.status).toBe(200);
+    const notifiedUserIds = vi.mocked(notifyUser).mock.calls.map((call) => call[0]);
+    expect(new Set(notifiedUserIds)).toEqual(new Set([memberId, headId]));
   });
 
   it('rejects a member marking a chore’s zone overdue with 403', async () => {
