@@ -157,3 +157,13 @@ export class ChoreStatusManagedByZonesError extends AppError {
     );
   }
 }
+
+export class ChoreScheduleManagedByZonesError extends AppError {
+  constructor() {
+    super(
+      400,
+      'ChoreScheduleManagedByZones',
+      'This chore has zones — set a schedule on each zone individually',
+    );
+  }
+}
