@@ -3,6 +3,8 @@ import type { ChoreAssignment, ChoreZoneStatus, SettableChoreStatus } from '../.
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
 import { ChoreStatusActions } from './ChoreStatusActions';
+import { ChoreScheduleControl } from './ChoreScheduleControl';
+import type { Schedule, ScheduleInput } from '../../types/schedule';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreZoneSectionProps {
@@ -19,6 +21,10 @@ interface ChoreZoneSectionProps {
   onUnassign: (choreId: number, assignmentId: number) => void;
   statusUpdatingKey: string | null;
   onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
+  scheduleByTarget: Map<string, Schedule>;
+  scheduleSubmittingKey: string | null;
+  onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
+  onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
 }
 
 export function ChoreZoneSection({
@@ -35,9 +41,14 @@ export function ChoreZoneSection({
   onUnassign,
   statusUpdatingKey,
   onSetStatus,
+  scheduleByTarget,
+  scheduleSubmittingKey,
+  onSetSchedule,
+  onRemoveSchedule,
 }: ChoreZoneSectionProps) {
   const [expanded, setExpanded] = useState(false);
   const isUpdatingStatus = statusUpdatingKey === `${choreId}:${zone.zoneId}`;
+  const scheduleKey = `${choreId}:${zone.zoneId}`;
 
   return (
     <li className={`chore-zone-section status-${zone.status}`}>
@@ -103,6 +114,13 @@ export function ChoreZoneSection({
             isHead={isHead}
             disabled={isUpdatingStatus}
             onSetStatus={(status) => onSetStatus(choreId, zone.zoneId, status)}
+          />
+          <ChoreScheduleControl
+            schedule={scheduleByTarget.get(scheduleKey) ?? null}
+            isHead={isHead}
+            submitting={scheduleSubmittingKey === scheduleKey}
+            onSave={(input) => onSetSchedule(choreId, zone.zoneId, input)}
+            onRemove={() => onRemoveSchedule(choreId, zone.zoneId)}
           />
         </div>
       )}

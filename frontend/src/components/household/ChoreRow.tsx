@@ -3,7 +3,9 @@ import type { Chore, ChoreStatus, SettableChoreStatus } from '../../types/chore'
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
 import { ChoreStatusActions } from './ChoreStatusActions';
+import { ChoreScheduleControl } from './ChoreScheduleControl';
 import { ChoreZoneSection } from './ChoreZoneSection';
+import type { Schedule, ScheduleInput } from '../../types/schedule';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreRowProps {
@@ -22,6 +24,10 @@ interface ChoreRowProps {
   onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
   removingChoreId: number | null;
   onRemove: (choreId: number) => void;
+  scheduleByTarget: Map<string, Schedule>;
+  scheduleSubmittingKey: string | null;
+  onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
+  onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
 }
 
 export function ChoreRow({
@@ -40,6 +46,10 @@ export function ChoreRow({
   onSetStatus,
   removingChoreId,
   onRemove,
+  scheduleByTarget,
+  scheduleSubmittingKey,
+  onSetSchedule,
+  onRemoveSchedule,
 }: ChoreRowProps) {
   const hasZones = chore.zones.length > 0;
   const visibleZones = visibleZoneIds
@@ -48,6 +58,7 @@ export function ChoreRow({
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const isRemoving = removingChoreId === chore.id;
   const isUpdatingStatus = statusUpdatingKey === `${chore.id}:none`;
+  const scheduleKey = `${chore.id}:none`;
 
   function assignmentsFor(zoneId: number | null) {
     return chore.assignments.filter((assignment) => assignment.zoneId === zoneId);
@@ -113,6 +124,15 @@ export function ChoreRow({
           className="chore-status-row"
         />
       )}
+      {!hasZones && (
+        <ChoreScheduleControl
+          schedule={scheduleByTarget.get(scheduleKey) ?? null}
+          isHead={isHead}
+          submitting={scheduleSubmittingKey === scheduleKey}
+          onSave={(input) => onSetSchedule(chore.id, null, input)}
+          onRemove={() => onRemoveSchedule(chore.id, null)}
+        />
+      )}
       {hasZones && (
         <ul className="chore-zones">
           {visibleZones.map((zone) => (
@@ -131,6 +151,10 @@ export function ChoreRow({
               onUnassign={onUnassign}
               statusUpdatingKey={statusUpdatingKey}
               onSetStatus={onSetStatus}
+              scheduleByTarget={scheduleByTarget}
+              scheduleSubmittingKey={scheduleSubmittingKey}
+              onSetSchedule={onSetSchedule}
+              onRemoveSchedule={onRemoveSchedule}
             />
           ))}
         </ul>
