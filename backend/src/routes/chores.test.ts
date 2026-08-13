@@ -1277,3 +1277,144 @@ describe('PATCH /api/households/:householdId/chores/:choreId/zones/:zoneId/statu
     expect(response.status).toBe(401);
   });
 });
+
+describe('chore schedules', () => {
+  it('lets the head set a one-off schedule on a zoneless chore', async () => {
+    const head = await registerHeadOfHousehold('sched-hoh@example.com', 'Schedule House');
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Water plants', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      // A 'once' schedule's nextRunAt is only non-null while startAt is still in the
+      // future relative to the real wall clock (scheduleService.insertSchedule calls
+      // computeInitialNextRunAt with Date.now(), not an injectable clock) — deliberately
+      // far in the future so this test doesn't rot as real time passes.
+      .send({ recurrenceType: 'once', startDate: '2030-06-01', startTime: '09:00' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.schedule).toEqual({
+      recurrenceType: 'once',
+      startDate: '2030-06-01',
+      startTime: '09:00',
+      intervalDays: null,
+      intervalWeeks: null,
+      weekdays: null,
+      intervalMonths: null,
+      nextRunAt: expect.any(Number),
+    });
+  });
+
+  it('lets the head set a weekly schedule on a specific chore zone', async () => {
+    const head = await registerHeadOfHousehold('sched-zone-hoh@example.com', 'Schedule Zone House');
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    const kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Wipe counters', zoneIds: [kitchenZoneId] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/zones/${kitchenZoneId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'weekly',
+        startDate: '2026-06-01',
+        startTime: '18:00',
+        intervalWeeks: 1,
+        weekdays: [1, 4],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.schedule.recurrenceType).toBe('weekly');
+    expect(response.body.schedule.weekdays).toEqual([1, 4]);
+  });
+
+  it('rejects setting a whole-chore schedule when the chore has zones', async () => {
+    const head = await registerHeadOfHousehold('sched-mismatch-hoh@example.com', 'Mismatch House');
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    const kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Zoned chore', zoneIds: [kitchenZoneId] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({ recurrenceType: 'once', startDate: '2026-06-01', startTime: '09:00' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ChoreScheduleManagedByZones');
+  });
+
+  it('rejects a non-head member with 403', async () => {
+    const head = await registerHeadOfHousehold('sched-member-hoh@example.com', 'Member Schedule House');
+    const member = await registerAndJoin('sched-member@example.com', head);
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Not yours to schedule', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', member.cookie)
+      .send({ recurrenceType: 'once', startDate: '2026-06-01', startTime: '09:00' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('removes a schedule', async () => {
+    const head = await registerHeadOfHousehold('sched-remove-hoh@example.com', 'Remove Schedule House');
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Take out recycling', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+    await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({ recurrenceType: 'once', startDate: '2026-06-01', startTime: '09:00' });
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(204);
+
+    const listResponse = await request(app)
+      .get(`/api/households/${head.householdId}/chores/schedules`)
+      .set('Cookie', head.cookie);
+    expect(listResponse.body.schedules).toEqual([]);
+  });
+
+  it('lists every schedule for the household, tagged with its target', async () => {
+    const head = await registerHeadOfHousehold('sched-list-hoh@example.com', 'List Schedule House');
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Listed chore', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+    await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({ recurrenceType: 'every_n_days', startDate: '2026-06-01', startTime: '09:00', intervalDays: 2 });
+
+    const response = await request(app)
+      .get(`/api/households/${head.householdId}/chores/schedules`)
+      .set('Cookie', head.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.schedules).toEqual([
+      expect.objectContaining({ choreId, zoneId: null, recurrenceType: 'every_n_days' }),
+    ]);
+  });
+});
