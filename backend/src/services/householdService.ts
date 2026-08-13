@@ -193,6 +193,11 @@ export function declineMember(
   return listMembers(householdId);
 }
 
+export function setTimezone(householdId: number, requestingUserId: number, timezone: string): void {
+  requireMembership(householdId, requestingUserId);
+  db.update(households).set({ timezone }).where(eq(households.id, householdId)).run();
+}
+
 // "Assigning" a pending applicant to an existing account-less member (see
 // createMember) means they're the same real person: a head added a placeholder for
 // someone before that person had their own login, and now that person has joined for

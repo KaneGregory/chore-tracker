@@ -7,6 +7,7 @@ import {
   createMemberSchema,
   householdParamsSchema,
   memberParamsSchema,
+  setHouseholdTimezoneSchema,
 } from '../validation/householdSchemas.js';
 import * as householdService from '../services/householdService.js';
 import * as authService from '../services/authService.js';
@@ -27,6 +28,29 @@ householdsRouter.post('/', (req, res, next) => {
   try {
     const household = authService.addHouseholdForExistingUser(req.user.id, parsed.data);
     res.status(201).json({ household });
+  } catch (err) {
+    next(err);
+  }
+});
+
+householdsRouter.patch('/:householdId/timezone', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = householdParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid household id', paramsParsed.error.issues));
+    return;
+  }
+
+  const bodyParsed = setHouseholdTimezoneSchema.safeParse(req.body);
+  if (!bodyParsed.success) {
+    next(new ValidationError('Invalid timezone', bodyParsed.error.issues));
+    return;
+  }
+
+  try {
+    householdService.setTimezone(paramsParsed.data.householdId, req.user.id, bodyParsed.data.timezone);
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

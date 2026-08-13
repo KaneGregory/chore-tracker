@@ -676,3 +676,40 @@ describe('POST /api/households', () => {
     expect(response.status).toBe(401);
   });
 });
+
+describe('PATCH /api/households/:householdId/timezone', () => {
+  it('lets any active member set the household timezone', async () => {
+    const head = await registerHeadOfHousehold('tz-hoh@example.com', 'Timezone House');
+    const member = await registerAndJoin('tz-member@example.com', head);
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', member.cookie)
+      .send({ timezone: 'America/New_York' });
+
+    expect(response.status).toBe(204);
+  });
+
+  it('rejects an invalid timezone name', async () => {
+    const head = await registerHeadOfHousehold('tz-invalid-hoh@example.com', 'Invalid TZ House');
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', head.cookie)
+      .send({ timezone: 'Not/AZone' });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a non-member with a generic 404', async () => {
+    const head = await registerHeadOfHousehold('tz-outsider-hoh@example.com', 'Outsider TZ House');
+    const outsider = await registerHeadOfHousehold('tz-outsider@example.com', 'Outsider TZ House 2');
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', outsider.cookie)
+      .send({ timezone: 'UTC' });
+
+    expect(response.status).toBe(404);
+  });
+});
