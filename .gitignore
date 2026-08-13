@@ -6,3 +6,7 @@ dist/
 *.db-shm
 .env
 .idea/
+
+# Scratch workspace for the subagent-driven-development skill (ledgers, briefs,
+# reports, review packages) — not part of the project.
+.superpowers/
