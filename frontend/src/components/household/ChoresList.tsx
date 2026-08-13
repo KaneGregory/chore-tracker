@@ -1,5 +1,6 @@
 import type { SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
+import type { Schedule, ScheduleInput } from '../../types/schedule';
 import type { FilteredChore } from '../../utils/choreFilter';
 import { ChoreRow } from './ChoreRow';
 
@@ -18,6 +19,10 @@ interface ChoresListProps {
   onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) => void;
   removingChoreId: number | null;
   onRemove: (choreId: number) => void;
+  scheduleByTarget: Map<string, Schedule>;
+  scheduleSubmittingKey: string | null;
+  onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
+  onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
 }
 
 export function ChoresList({
@@ -35,6 +40,10 @@ export function ChoresList({
   onSetStatus,
   removingChoreId,
   onRemove,
+  scheduleByTarget,
+  scheduleSubmittingKey,
+  onSetSchedule,
+  onRemoveSchedule,
 }: ChoresListProps) {
   if (chores.length === 0) {
     return (
@@ -64,6 +73,10 @@ export function ChoresList({
           onSetStatus={onSetStatus}
           removingChoreId={removingChoreId}
           onRemove={onRemove}
+          scheduleByTarget={scheduleByTarget}
+          scheduleSubmittingKey={scheduleSubmittingKey}
+          onSetSchedule={onSetSchedule}
+          onRemoveSchedule={onRemoveSchedule}
         />
       ))}
     </ul>

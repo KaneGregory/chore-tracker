@@ -5,12 +5,14 @@ import { ErrorBanner } from '../common/ErrorBanner';
 import * as zoneApi from '../../api/zoneApi';
 import * as choreApi from '../../api/choreApi';
 import * as householdApi from '../../api/householdApi';
+import * as scheduleApi from '../../api/scheduleApi';
 import { ApiError } from '../../api/httpClient';
 import { flattenZones } from '../../utils/zoneTree';
 import { filterChores } from '../../utils/choreFilter';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
 import type { Chore, ChoreFilter, SettableChoreStatus } from '../../types/chore';
+import type { Schedule, ScheduleInput, ScheduleWithTarget } from '../../types/schedule';
 
 export function HouseholdCard({
   household,
@@ -30,6 +32,8 @@ export function HouseholdCard({
   const [statusUpdatingKey, setStatusUpdatingKey] = useState<string | null>(null);
   const [removingChoreId, setRemovingChoreId] = useState<number | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<ScheduleWithTarget[]>([]);
+  const [scheduleSubmittingKey, setScheduleSubmittingKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +83,31 @@ export function HouseholdCard({
     return () => {
       cancelled = true;
     };
+  }, [household.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    scheduleApi
+      .listSchedules(household.id)
+      .then((result) => {
+        if (!cancelled) setSchedules(result);
+      })
+      .catch(() => {
+        // Same rationale as the members fetch above: schedules are secondary to
+        // viewing chores, so a failure here shouldn't block the page.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [household.id]);
+
+  useEffect(() => {
+    // Best-effort, silent, same rationale as resyncPushSubscription: keeps the
+    // household's stored timezone fresh for the daily reminder scheduler without
+    // surfacing anything to the user if it fails.
+    householdApi
+      .syncTimezone(household.id, Intl.DateTimeFormat().resolvedOptions().timeZone)
+      .catch(() => {});
   }, [household.id]);
 
   async function handleAssign(choreId: number, userId: number, zoneId: number | null) {
@@ -141,8 +170,49 @@ export function HouseholdCard({
     }
   }
 
+  async function handleSetSchedule(choreId: number, zoneId: number | null, input: ScheduleInput) {
+    const key = `${choreId}:${zoneId ?? 'none'}`;
+    setScheduleSubmittingKey(key);
+    setAssignError(null);
+    try {
+      const updated =
+        zoneId === null
+          ? await scheduleApi.setChoreSchedule(household.id, choreId, input)
+          : await scheduleApi.setChoreZoneSchedule(household.id, choreId, zoneId, input);
+      setSchedules((prev) => [
+        ...prev.filter((schedule) => !(schedule.choreId === choreId && schedule.zoneId === zoneId)),
+        { ...updated, choreId, zoneId },
+      ]);
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not save that schedule.');
+    } finally {
+      setScheduleSubmittingKey(null);
+    }
+  }
+
+  async function handleRemoveSchedule(choreId: number, zoneId: number | null) {
+    const key = `${choreId}:${zoneId ?? 'none'}`;
+    setScheduleSubmittingKey(key);
+    setAssignError(null);
+    try {
+      if (zoneId === null) {
+        await scheduleApi.removeChoreSchedule(household.id, choreId);
+      } else {
+        await scheduleApi.removeChoreZoneSchedule(household.id, choreId, zoneId);
+      }
+      setSchedules((prev) => prev.filter((schedule) => !(schedule.choreId === choreId && schedule.zoneId === zoneId)));
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not remove that schedule.');
+    } finally {
+      setScheduleSubmittingKey(null);
+    }
+  }
+
   if (state.status !== 'authenticated') return null;
   const isHead = household.role === 'head';
+  const scheduleByTarget = new Map<string, Schedule>(
+    schedules.map((schedule) => [`${schedule.choreId}:${schedule.zoneId ?? 'none'}`, schedule]),
+  );
 
   return (
     <>
@@ -165,6 +235,10 @@ export function HouseholdCard({
           }
           removingChoreId={removingChoreId}
           onRemove={(choreId) => void handleRemoveChore(choreId)}
+          scheduleByTarget={scheduleByTarget}
+          scheduleSubmittingKey={scheduleSubmittingKey}
+          onSetSchedule={(choreId, zoneId, input) => void handleSetSchedule(choreId, zoneId, input)}
+          onRemoveSchedule={(choreId, zoneId) => void handleRemoveSchedule(choreId, zoneId)}
         />
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>
