@@ -6,6 +6,7 @@ import { ChoreStatusActions } from './ChoreStatusActions';
 import { ChoreScheduleControl } from './ChoreScheduleControl';
 import { ChoreZoneSection } from './ChoreZoneSection';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
+import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreRowProps {
@@ -28,6 +29,11 @@ interface ChoreRowProps {
   scheduleSubmittingKey: string | null;
   onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
+  patterns: SchedulePattern[];
+  onSaveAsPattern: (input: CreatePatternInput) => void;
+  selectMode: boolean;
+  selectedTargets: Set<string>;
+  onToggleTarget: (choreId: number, zoneId: number | null) => void;
 }
 
 export function ChoreRow({
@@ -50,6 +56,11 @@ export function ChoreRow({
   scheduleSubmittingKey,
   onSetSchedule,
   onRemoveSchedule,
+  patterns,
+  onSaveAsPattern,
+  selectMode,
+  selectedTargets,
+  onToggleTarget,
 }: ChoreRowProps) {
   const hasZones = chore.zones.length > 0;
   const visibleZones = visibleZoneIds
@@ -125,13 +136,26 @@ export function ChoreRow({
         />
       )}
       {!hasZones && (
-        <ChoreScheduleControl
-          schedule={scheduleByTarget.get(scheduleKey) ?? null}
-          isHead={isHead}
-          submitting={scheduleSubmittingKey === scheduleKey}
-          onSave={(input) => onSetSchedule(chore.id, null, input)}
-          onRemove={() => onRemoveSchedule(chore.id, null)}
-        />
+        <div className="chore-schedule-row">
+          {selectMode && (
+            <label className="chore-select-checkbox">
+              <input
+                type="checkbox"
+                checked={selectedTargets.has(scheduleKey)}
+                onChange={() => onToggleTarget(chore.id, null)}
+              />
+            </label>
+          )}
+          <ChoreScheduleControl
+            schedule={scheduleByTarget.get(scheduleKey) ?? null}
+            patterns={patterns}
+            isHead={isHead}
+            submitting={scheduleSubmittingKey === scheduleKey}
+            onSave={(input) => onSetSchedule(chore.id, null, input)}
+            onSaveAsPattern={onSaveAsPattern}
+            onRemove={() => onRemoveSchedule(chore.id, null)}
+          />
+        </div>
       )}
       {hasZones && (
         <ul className="chore-zones">
@@ -155,6 +179,11 @@ export function ChoreRow({
               scheduleSubmittingKey={scheduleSubmittingKey}
               onSetSchedule={onSetSchedule}
               onRemoveSchedule={onRemoveSchedule}
+              patterns={patterns}
+              onSaveAsPattern={onSaveAsPattern}
+              selectMode={selectMode}
+              selectedTargets={selectedTargets}
+              onToggleTarget={onToggleTarget}
             />
           ))}
         </ul>

@@ -5,6 +5,7 @@ import { AssignmentChips } from './AssignmentChips';
 import { ChoreStatusActions } from './ChoreStatusActions';
 import { ChoreScheduleControl } from './ChoreScheduleControl';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
+import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreZoneSectionProps {
@@ -25,6 +26,11 @@ interface ChoreZoneSectionProps {
   scheduleSubmittingKey: string | null;
   onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
+  patterns: SchedulePattern[];
+  onSaveAsPattern: (input: CreatePatternInput) => void;
+  selectMode: boolean;
+  selectedTargets: Set<string>;
+  onToggleTarget: (choreId: number, zoneId: number | null) => void;
 }
 
 export function ChoreZoneSection({
@@ -45,6 +51,11 @@ export function ChoreZoneSection({
   scheduleSubmittingKey,
   onSetSchedule,
   onRemoveSchedule,
+  patterns,
+  onSaveAsPattern,
+  selectMode,
+  selectedTargets,
+  onToggleTarget,
 }: ChoreZoneSectionProps) {
   const [expanded, setExpanded] = useState(false);
   const isUpdatingStatus = statusUpdatingKey === `${choreId}:${zone.zoneId}`;
@@ -115,13 +126,26 @@ export function ChoreZoneSection({
             disabled={isUpdatingStatus}
             onSetStatus={(status) => onSetStatus(choreId, zone.zoneId, status)}
           />
-          <ChoreScheduleControl
-            schedule={scheduleByTarget.get(scheduleKey) ?? null}
-            isHead={isHead}
-            submitting={scheduleSubmittingKey === scheduleKey}
-            onSave={(input) => onSetSchedule(choreId, zone.zoneId, input)}
-            onRemove={() => onRemoveSchedule(choreId, zone.zoneId)}
-          />
+          <div className="chore-schedule-row">
+            {selectMode && (
+              <label className="chore-select-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedTargets.has(scheduleKey)}
+                  onChange={() => onToggleTarget(choreId, zone.zoneId)}
+                />
+              </label>
+            )}
+            <ChoreScheduleControl
+              schedule={scheduleByTarget.get(scheduleKey) ?? null}
+              patterns={patterns}
+              isHead={isHead}
+              submitting={scheduleSubmittingKey === scheduleKey}
+              onSave={(input) => onSetSchedule(choreId, zone.zoneId, input)}
+              onSaveAsPattern={onSaveAsPattern}
+              onRemove={() => onRemoveSchedule(choreId, zone.zoneId)}
+            />
+          </div>
         </div>
       )}
     </li>
