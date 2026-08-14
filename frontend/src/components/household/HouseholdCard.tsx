@@ -6,13 +6,16 @@ import * as zoneApi from '../../api/zoneApi';
 import * as choreApi from '../../api/choreApi';
 import * as householdApi from '../../api/householdApi';
 import * as scheduleApi from '../../api/scheduleApi';
+import * as patternApi from '../../api/patternApi';
 import { ApiError } from '../../api/httpClient';
 import { flattenZones } from '../../utils/zoneTree';
 import { filterChores } from '../../utils/choreFilter';
+import { BulkScheduleBar } from './BulkScheduleBar';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
 import type { Chore, ChoreFilter, SettableChoreStatus } from '../../types/chore';
 import type { Schedule, ScheduleInput, ScheduleWithTarget } from '../../types/schedule';
+import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
 
 export function HouseholdCard({
   household,
@@ -34,6 +37,11 @@ export function HouseholdCard({
   const [assignError, setAssignError] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<ScheduleWithTarget[]>([]);
   const [scheduleSubmittingKey, setScheduleSubmittingKey] = useState<string | null>(null);
+  const [patterns, setPatterns] = useState<SchedulePattern[]>([]);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkResultMessage, setBulkResultMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +103,22 @@ export function HouseholdCard({
       .catch(() => {
         // Same rationale as the members fetch above: schedules are secondary to
         // viewing chores, so a failure here shouldn't block the page.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [household.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    patternApi
+      .listPatterns(household.id)
+      .then((result) => {
+        if (!cancelled) setPatterns(result);
+      })
+      .catch(() => {
+        // Same rationale as members/schedules above: patterns are a convenience for
+        // setting up a schedule faster, not required to view or manage chores.
       });
     return () => {
       cancelled = true;
@@ -210,6 +234,83 @@ export function HouseholdCard({
     }
   }
 
+  async function handleSaveAsPattern(input: CreatePatternInput) {
+    try {
+      const created = await patternApi.createPattern(household.id, input);
+      setPatterns((prev) => [...prev, created]);
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not save that pattern.');
+    }
+  }
+
+  function toggleSelectMode() {
+    setSelectMode((prev) => !prev);
+    setSelectedTargets(new Set());
+    setBulkResultMessage(null);
+  }
+
+  function handleToggleTarget(choreId: number, zoneId: number | null) {
+    const key = `${choreId}:${zoneId ?? 'none'}`;
+    setSelectedTargets((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  async function handleBulkApplySchedule(input: ScheduleInput) {
+    setBulkSubmitting(true);
+    setBulkResultMessage(null);
+
+    const targets = [...selectedTargets].map((key) => {
+      const [choreIdText, zoneIdText] = key.split(':');
+      return {
+        choreId: Number(choreIdText),
+        zoneId: zoneIdText === 'none' ? null : Number(zoneIdText),
+      };
+    });
+
+    const results = await Promise.allSettled(
+      targets.map((target) =>
+        target.zoneId === null
+          ? scheduleApi.setChoreSchedule(household.id, target.choreId, input)
+          : scheduleApi.setChoreZoneSchedule(household.id, target.choreId, target.zoneId, input),
+      ),
+    );
+
+    const updates = results
+      .map((result, index) =>
+        result.status === 'fulfilled' ? { ...targets[index], schedule: result.value } : null,
+      )
+      .filter((update): update is { choreId: number; zoneId: number | null; schedule: Schedule } => update !== null);
+
+    setSchedules((prev) => {
+      const remaining = prev.filter(
+        (schedule) =>
+          !updates.some((update) => update.choreId === schedule.choreId && update.zoneId === schedule.zoneId),
+      );
+      return [
+        ...remaining,
+        ...updates.map((update) => ({ ...update.schedule, choreId: update.choreId, zoneId: update.zoneId })),
+      ];
+    });
+
+    const succeeded = updates.length;
+    const failed = results.length - succeeded;
+    setBulkResultMessage(
+      failed === 0
+        ? `Applied to all ${succeeded} selected.`
+        : `Applied to ${succeeded} of ${results.length} — ${failed} failed.`,
+    );
+    setBulkSubmitting(false);
+    setSelectMode(false);
+    setSelectedTargets(new Set());
+  }
+
   if (state.status !== 'authenticated') return null;
   const isHead = household.role === 'head';
   const scheduleByTarget = new Map<string, Schedule>(
@@ -220,28 +321,46 @@ export function HouseholdCard({
     <>
       <ErrorBanner message={zoneError ?? choresError ?? assignError} />
       {chores && zoneTree ? (
-        <ChoresList
-          chores={filterChores(chores, filter, state.user.id)}
-          allChoresCount={chores.length}
-          zoneNameById={new Map(flattenZones(zoneTree).map((zone) => [zone.id, zone.name]))}
-          members={members}
-          currentUserId={state.user.id}
-          isHead={isHead}
-          assigningKey={assigningKey}
-          onAssign={(choreId, userId, zoneId) => void handleAssign(choreId, userId, zoneId)}
-          unassigningId={unassigningId}
-          onUnassign={(choreId, assignmentId) => void handleUnassign(choreId, assignmentId)}
-          statusUpdatingKey={statusUpdatingKey}
-          onSetStatus={(choreId, zoneId, status) =>
-            void handleSetStatus(choreId, zoneId, status)
-          }
-          removingChoreId={removingChoreId}
-          onRemove={(choreId) => void handleRemoveChore(choreId)}
-          scheduleByTarget={scheduleByTarget}
-          scheduleSubmittingKey={scheduleSubmittingKey}
-          onSetSchedule={(choreId, zoneId, input) => void handleSetSchedule(choreId, zoneId, input)}
-          onRemoveSchedule={(choreId, zoneId) => void handleRemoveSchedule(choreId, zoneId)}
-        />
+        <>
+          <BulkScheduleBar
+            isHead={isHead}
+            selectMode={selectMode}
+            onToggleSelectMode={toggleSelectMode}
+            selectedCount={selectedTargets.size}
+            patterns={patterns}
+            submitting={bulkSubmitting}
+            resultMessage={bulkResultMessage}
+            onApply={(input) => void handleBulkApplySchedule(input)}
+            onSaveAsPattern={(input) => void handleSaveAsPattern(input)}
+          />
+          <ChoresList
+            chores={filterChores(chores, filter, state.user.id)}
+            allChoresCount={chores.length}
+            zoneNameById={new Map(flattenZones(zoneTree).map((zone) => [zone.id, zone.name]))}
+            members={members}
+            currentUserId={state.user.id}
+            isHead={isHead}
+            assigningKey={assigningKey}
+            onAssign={(choreId, userId, zoneId) => void handleAssign(choreId, userId, zoneId)}
+            unassigningId={unassigningId}
+            onUnassign={(choreId, assignmentId) => void handleUnassign(choreId, assignmentId)}
+            statusUpdatingKey={statusUpdatingKey}
+            onSetStatus={(choreId, zoneId, status) =>
+              void handleSetStatus(choreId, zoneId, status)
+            }
+            removingChoreId={removingChoreId}
+            onRemove={(choreId) => void handleRemoveChore(choreId)}
+            scheduleByTarget={scheduleByTarget}
+            scheduleSubmittingKey={scheduleSubmittingKey}
+            onSetSchedule={(choreId, zoneId, input) => void handleSetSchedule(choreId, zoneId, input)}
+            onRemoveSchedule={(choreId, zoneId) => void handleRemoveSchedule(choreId, zoneId)}
+            patterns={patterns}
+            onSaveAsPattern={(input) => void handleSaveAsPattern(input)}
+            selectMode={selectMode}
+            selectedTargets={selectedTargets}
+            onToggleTarget={handleToggleTarget}
+          />
+        </>
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>
       )}
