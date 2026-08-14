@@ -167,3 +167,9 @@ export class ChoreScheduleManagedByZonesError extends AppError {
     );
   }
 }
+
+export class PatternNotFoundError extends AppError {
+  constructor() {
+    super(404, 'PatternNotFound', 'That schedule pattern was not found');
+  }
+}
