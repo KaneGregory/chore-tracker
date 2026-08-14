@@ -1,6 +1,7 @@
 import type { SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
+import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
 import type { FilteredChore } from '../../utils/choreFilter';
 import { ChoreRow } from './ChoreRow';
 
@@ -23,6 +24,11 @@ interface ChoresListProps {
   scheduleSubmittingKey: string | null;
   onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
+  patterns: SchedulePattern[];
+  onSaveAsPattern: (input: CreatePatternInput) => void;
+  selectMode: boolean;
+  selectedTargets: Set<string>;
+  onToggleTarget: (choreId: number, zoneId: number | null) => void;
 }
 
 export function ChoresList({
@@ -44,6 +50,11 @@ export function ChoresList({
   scheduleSubmittingKey,
   onSetSchedule,
   onRemoveSchedule,
+  patterns,
+  onSaveAsPattern,
+  selectMode,
+  selectedTargets,
+  onToggleTarget,
 }: ChoresListProps) {
   if (chores.length === 0) {
     return (
@@ -77,6 +88,11 @@ export function ChoresList({
           scheduleSubmittingKey={scheduleSubmittingKey}
           onSetSchedule={onSetSchedule}
           onRemoveSchedule={onRemoveSchedule}
+          patterns={patterns}
+          onSaveAsPattern={onSaveAsPattern}
+          selectMode={selectMode}
+          selectedTargets={selectedTargets}
+          onToggleTarget={onToggleTarget}
         />
       ))}
     </ul>
