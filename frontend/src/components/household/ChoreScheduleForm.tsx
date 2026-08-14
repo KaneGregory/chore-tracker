@@ -1,17 +1,28 @@
 import { useState, type FormEvent } from 'react';
 import type { RecurrenceType, Schedule, ScheduleInput } from '../../types/schedule';
+import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
 import { FormField } from '../common/FormField';
+import { suggestStartDate } from '../../utils/suggestStartDate';
 
 interface ChoreScheduleFormProps {
   schedule: Schedule | null;
+  patterns: SchedulePattern[];
   submitting: boolean;
   onSave: (input: ScheduleInput) => void;
+  onSaveAsPattern: (input: CreatePatternInput) => void;
   onCancel: () => void;
 }
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: ChoreScheduleFormProps) {
+export function ChoreScheduleForm({
+  schedule,
+  patterns,
+  submitting,
+  onSave,
+  onSaveAsPattern,
+  onCancel,
+}: ChoreScheduleFormProps) {
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(schedule?.recurrenceType ?? 'once');
   const [startDate, setStartDate] = useState(schedule?.startDate ?? '');
   const [startTime, setStartTime] = useState(schedule?.startTime ?? '09:00');
@@ -19,6 +30,8 @@ export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: Ch
   const [intervalWeeks, setIntervalWeeks] = useState(schedule?.intervalWeeks ?? 1);
   const [weekdays, setWeekdays] = useState<Set<number>>(new Set(schedule?.weekdays ?? []));
   const [intervalMonths, setIntervalMonths] = useState(schedule?.intervalMonths ?? 1);
+  const [saveAsPattern, setSaveAsPattern] = useState(false);
+  const [patternName, setPatternName] = useState('');
 
   function toggleWeekday(day: number) {
     setWeekdays((prev) => {
@@ -32,6 +45,44 @@ export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: Ch
     });
   }
 
+  // Pre-fills every field a pattern carries, plus a suggested Date the user can
+  // still change before saving — see suggestStartDate.ts.
+  function applyPattern(patternId: string) {
+    const pattern = patterns.find((candidate) => String(candidate.id) === patternId);
+    if (!pattern) return;
+
+    setRecurrenceType(pattern.recurrenceType);
+    setStartTime(pattern.startTime);
+    if (pattern.intervalDays !== null) setIntervalDays(pattern.intervalDays);
+    if (pattern.intervalWeeks !== null) setIntervalWeeks(pattern.intervalWeeks);
+    if (pattern.weekdays !== null) setWeekdays(new Set(pattern.weekdays));
+    if (pattern.intervalMonths !== null) setIntervalMonths(pattern.intervalMonths);
+    setStartDate(suggestStartDate(pattern));
+  }
+
+  // Mirrors scheduleService.ts's buildRowValues: dayOfMonth for a saved pattern is
+  // derived from the form's current Date, the same rule the backend already applies
+  // when saving the schedule itself — there is no separate dayOfMonth field/state to
+  // keep in sync.
+  function buildPatternInput(name: string): CreatePatternInput | null {
+    switch (recurrenceType) {
+      case 'every_n_days':
+        return { recurrenceType, name, startTime, intervalDays };
+      case 'weekly':
+        return { recurrenceType, name, startTime, intervalWeeks, weekdays: [...weekdays] };
+      case 'monthly':
+        return {
+          recurrenceType,
+          name,
+          startTime,
+          intervalMonths,
+          dayOfMonth: Number(startDate.split('-')[2]),
+        };
+      case 'once':
+        return null;
+    }
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!startDate) return;
@@ -39,22 +90,44 @@ export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: Ch
     switch (recurrenceType) {
       case 'once':
         onSave({ recurrenceType, startDate, startTime });
-        return;
+        break;
       case 'every_n_days':
         onSave({ recurrenceType, startDate, startTime, intervalDays });
-        return;
+        break;
       case 'weekly':
         if (weekdays.size === 0) return;
         onSave({ recurrenceType, startDate, startTime, intervalWeeks, weekdays: [...weekdays] });
-        return;
+        break;
       case 'monthly':
         onSave({ recurrenceType, startDate, startTime, intervalMonths });
-        return;
+        break;
+    }
+
+    const trimmedName = patternName.trim();
+    if (saveAsPattern && trimmedName) {
+      const patternInput = buildPatternInput(trimmedName);
+      if (patternInput) onSaveAsPattern(patternInput);
     }
   }
 
   return (
     <form className="chore-schedule-form" onSubmit={handleSubmit}>
+      {patterns.length > 0 && (
+        <label className="schedule-field">
+          Use a pattern
+          <select defaultValue="" onChange={(event) => applyPattern(event.target.value)}>
+            <option value="" disabled>
+              Choose a saved pattern…
+            </option>
+            {patterns.map((pattern) => (
+              <option key={pattern.id} value={pattern.id}>
+                {pattern.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <label className="schedule-field">
         Repeats
         <select
@@ -130,6 +203,28 @@ export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: Ch
       )}
 
       <FormField label="At" name="scheduleStartTime" type="time" value={startTime} onChange={setStartTime} required />
+
+      {recurrenceType !== 'once' && (
+        <label className="schedule-field schedule-save-as-pattern">
+          <span>
+            <input
+              type="checkbox"
+              checked={saveAsPattern}
+              onChange={(event) => setSaveAsPattern(event.target.checked)}
+            />
+            Save as a reusable pattern
+          </span>
+          {saveAsPattern && (
+            <input
+              type="text"
+              placeholder="Pattern name"
+              value={patternName}
+              onChange={(event) => setPatternName(event.target.value)}
+              required
+            />
+          )}
+        </label>
+      )}
 
       <div className="schedule-form-actions">
         <button type="submit" className="btn btn-pill-outline" disabled={submitting}>
