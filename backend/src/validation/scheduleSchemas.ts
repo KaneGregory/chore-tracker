@@ -24,8 +24,8 @@ const startDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
   .refine(isReasonableStartDate, 'Start date must be a real calendar date, not more than a year in the past');
-const startTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM');
-const weekdaySchema = z.number().int().min(0).max(6);
+export const startTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM');
+export const weekdaySchema = z.number().int().min(0).max(6);
 
 const onceScheduleSchema = z.object({
   recurrenceType: z.literal('once'),
