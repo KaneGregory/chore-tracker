@@ -72,6 +72,13 @@ export function UserMenu() {
               >
                 Members
               </Link>
+              <Link
+                role="menuitem"
+                to={`/households/${household.id}/patterns`}
+                onClick={() => setIsOpen(false)}
+              >
+                Schedule patterns
+              </Link>
             </>
           )}
           <NotificationOptIn />

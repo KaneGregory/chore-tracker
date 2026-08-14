@@ -8,6 +8,7 @@ import { HomePage } from './pages/HomePage';
 import { CreateChorePage } from './pages/CreateChorePage';
 import { ZonesPage } from './pages/ZonesPage';
 import { MembersPage } from './pages/MembersPage';
+import { SchedulePatternsPage } from './pages/SchedulePatternsPage';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
               <Route path="/households/:householdId/chores/new" element={<CreateChorePage />} />
               <Route path="/households/:householdId/zones" element={<ZonesPage />} />
               <Route path="/households/:householdId/members" element={<MembersPage />} />
+              <Route path="/households/:householdId/patterns" element={<SchedulePatternsPage />} />
             </Route>
           </Routes>
         </AppShell>
