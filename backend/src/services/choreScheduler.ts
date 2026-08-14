@@ -59,24 +59,38 @@ export function checkSchedules(now: number = Date.now()): void {
     .all();
 
   for (const row of due) {
-    const target = resolveTarget(row);
-    if (!target) continue;
+    try {
+      const target = resolveTarget(row);
+      if (!target) continue;
 
-    // The firing rule itself (flip 'complete' -> 'to-do', leave 'overdue'/'to-do'
-    // alone) lives in choreService's systemReopenChore/systemReopenChoreZone — this
-    // loop doesn't need to know or care whether it was a no-op.
-    if (target.zoneId === null) {
-      systemReopenChore(target.choreId);
-    } else {
-      systemReopenChoreZone(target.choreId, target.zoneId);
+      // The firing rule itself (flip 'complete' -> 'to-do', leave 'overdue'/'to-do'
+      // alone) lives in choreService's systemReopenChore/systemReopenChoreZone — this
+      // loop doesn't need to know or care whether it was a no-op.
+      if (target.zoneId === null) {
+        systemReopenChore(target.choreId);
+      } else {
+        systemReopenChoreZone(target.choreId, target.zoneId);
+      }
+
+      const nextRunAt =
+        row.recurrenceType === 'once'
+          ? null
+          : advanceUntilFuture(toRecurrence(row), householdTimezoneForChore(target.choreId), now, row.nextRunAt!);
+
+      db.update(choreSchedules).set({ nextRunAt }).where(eq(choreSchedules.id, row.id)).run();
+    } catch (err) {
+      // No per-row error isolation here previously meant one malformed row (a
+      // JSON.parse failure on corrupted weekdays, an Intl error on a garbage stored
+      // timezone, or Finding 1's new bounded-loop error) could throw out of this loop,
+      // out of the setInterval callback, and — with no uncaughtException handler
+      // anywhere in this app — crash the whole process. Disabling the row rather than
+      // leaving nextRunAt due mirrors dailyReminderScheduler.ts's per-subscription
+      // try/catch: there's no automatic resync path for a schedule row the way there
+      // is for push subscriptions, so simply skipping it would just re-fail on every
+      // future poll tick forever.
+      console.error(`choreScheduler: disabling schedule ${row.id} after an error`, err);
+      db.update(choreSchedules).set({ nextRunAt: null }).where(eq(choreSchedules.id, row.id)).run();
     }
-
-    const nextRunAt =
-      row.recurrenceType === 'once'
-        ? null
-        : advanceUntilFuture(toRecurrence(row), householdTimezoneForChore(target.choreId), now, row.nextRunAt!);
-
-    db.update(choreSchedules).set({ nextRunAt }).where(eq(choreSchedules.id, row.id)).run();
   }
 }
 

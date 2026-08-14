@@ -234,6 +234,32 @@ describe('weekly recurrence', () => {
   });
 });
 
+describe('advanceUntilFuture — catch-up cap', () => {
+  it('throws rather than looping forever when intervalDays is null on an every_n_days row', () => {
+    // Simulates a corrupted chore_schedules row: recurrenceType 'every_n_days' with
+    // intervalDays null. Nothing enforces this pairing at the DB level (a known,
+    // already-accepted gap) — stepOnce's every_n_days branch computes
+    // `date + (null * DAY_MS)`, which is the exact same instant, so without a cap this
+    // would hang forever rather than just run slowly. Constructing the
+    // ScheduleRecurrence object directly bypasses normal validation, the only way to
+    // exercise the cap without waiting tens of seconds for a legitimately huge catch-up.
+    const startAt = Date.UTC(2026, 0, 1, 9, 0);
+    const schedule: ScheduleRecurrence = {
+      recurrenceType: 'every_n_days',
+      startAt,
+      intervalDays: null,
+      intervalWeeks: null,
+      weekdays: null,
+      intervalMonths: null,
+      dayOfMonth: null,
+    };
+    const now = Date.UTC(2026, 0, 2, 9, 0);
+    expect(() => advanceUntilFuture(schedule, 'UTC', now, startAt)).toThrow(
+      /maximum catch-up steps/,
+    );
+  });
+});
+
 describe('monthly recurrence', () => {
   it('advances by intervalMonths, keeping the same day of month', () => {
     const startAt = Date.UTC(2026, 0, 15, 9, 0); // Jan 15

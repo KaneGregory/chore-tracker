@@ -102,9 +102,11 @@ export function HouseholdCard({
   }, [household.id]);
 
   useEffect(() => {
-    // Best-effort, silent, same rationale as resyncPushSubscription: keeps the
-    // household's stored timezone fresh for the daily reminder scheduler without
-    // surfacing anything to the user if it fails.
+    // Best-effort, silent, same rationale as resyncPushSubscription: captures the
+    // household's timezone (used to evaluate chore schedules — see
+    // choreScheduler.ts) without surfacing anything to the user if it fails. Only the
+    // first sync from any household actually writes the column server-side
+    // (householdService.setTimezone) — later calls here are harmless no-ops.
     householdApi
       .syncTimezone(household.id, Intl.DateTimeFormat().resolvedOptions().timeZone)
       .catch(() => {});

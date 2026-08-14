@@ -166,4 +166,47 @@ describe('checkSchedules', () => {
     const schedules = db.select().from(choreSchedules).all();
     expect(schedules[0]?.nextRunAt).toBe(Date.UTC(2026, 0, 2, 9, 0));
   });
+
+  it('disables a malformed row after an error instead of crashing the whole pass', () => {
+    const now = Date.now();
+    // Corrupted row: recurrenceType 'every_n_days' with intervalDays null, same
+    // technique as scheduleTime.test.ts's catch-up-cap test — bypasses normal
+    // validation directly via db.insert, simulating a row that's malformed for any
+    // reason. Alongside it, one normal, valid, also-due schedule (a second chore),
+    // to prove one bad row doesn't take down the rest of the poll pass.
+    const malformed = db
+      .insert(choreSchedules)
+      .values({
+        choreId,
+        choreZoneId: null,
+        recurrenceType: 'every_n_days',
+        startAt: Date.UTC(2026, 0, 1, 9, 0),
+        intervalDays: null,
+        intervalWeeks: null,
+        weekdays: null,
+        intervalMonths: null,
+        dayOfMonth: null,
+        nextRunAt: Date.UTC(2026, 0, 1, 9, 0),
+        createdAt: now,
+      })
+      .returning({ id: choreSchedules.id })
+      .get();
+
+    const otherChoreId = db
+      .insert(chores)
+      .values({ householdId, name: 'Second scheduled chore', status: 'complete', createdAt: now })
+      .returning({ id: chores.id })
+      .get().id;
+    const valid = insertSchedule({ choreId: otherChoreId, nextRunAt: Date.UTC(2026, 0, 1, 9, 0) });
+    systemReopenChore.mockReturnValue(true);
+
+    expect(() => checkSchedules(Date.UTC(2026, 0, 1, 9, 0))).not.toThrow();
+
+    const malformedRow = db.select().from(choreSchedules).where(eq(choreSchedules.id, malformed.id)).get();
+    expect(malformedRow?.nextRunAt).toBeNull();
+
+    expect(systemReopenChore).toHaveBeenCalledWith(otherChoreId);
+    const validRow = db.select().from(choreSchedules).where(eq(choreSchedules.id, valid.id)).get();
+    expect(validRow?.nextRunAt).toBe(Date.UTC(2026, 0, 2, 9, 0));
+  });
 });

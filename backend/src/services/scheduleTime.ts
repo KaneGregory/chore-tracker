@@ -78,13 +78,19 @@ function offsetMs(instantMs: number, timeZone: string): number {
 }
 
 // Inverse of toLocalDateTime: the instant at which `timeZone` reads these wall-clock
-// components. Resolves the zone's offset from a same-instant guess rather than a true
-// two-pass search — accurate for any time outside the handful of ambiguous seconds
-// right at a DST transition itself, which a fixed schedule hour essentially never
-// lands on.
+// components. Two-pass: the first pass resolves the offset as if `guess` (a UTC
+// instant with the target's wall-clock digits) were the real instant, then re-resolves
+// the offset at `guess` shifted by that first offset — closer to the actual target
+// instant. A single-pass guess is fine for zones near UTC, but for a zone far from UTC
+// (e.g. Pacific/Auckland, UTC+13) the initial guess's local time can be ~13-14 hours
+// away from the target local time, which can land the offset lookup on the wrong side
+// of an annual DST transition. Still not a true fixed-point search, but accurate for
+// any time outside the handful of ambiguous seconds right at a DST transition itself,
+// which a fixed schedule hour essentially never lands on.
 export function fromLocalDateTime(local: LocalDateTime, timeZone: string): number {
   const guess = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute);
-  return guess - offsetMs(guess, timeZone);
+  const firstOffset = offsetMs(guess, timeZone);
+  return guess - offsetMs(guess - firstOffset, timeZone);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -178,6 +184,16 @@ function firstOccurrenceOnOrAfterAnchor(schedule: ScheduleRecurrence, timeZone: 
   return schedule.startAt;
 }
 
+// Hard cap on how many cycles advanceUntilFuture will step through in one call. Two
+// distinct failure modes without this: (1) a validated-but-old startDate (tightened
+// in scheduleSchemas.ts, but this is the last line of defense, not the only one) can
+// mean tens of thousands of legitimate steps; (2) a malformed chore_schedules row
+// (e.g. recurrenceType: 'every_n_days' with intervalDays: null — nothing at the DB
+// level currently enforces that pairing) makes stepOnce return the exact same instant
+// forever, an infinite loop rather than just a slow one. Either way, past this many
+// steps something is wrong with the row, not with a legitimately-overdue schedule.
+const MAX_CATCHUP_STEPS = 10_000;
+
 // Advances from `fromInstantMs` (defaulting to the schedule's own anchor) to the next
 // occurrence strictly after `now` — looping rather than a single step so a schedule
 // that missed several cycles (e.g. the server was down) catches up within one poll
@@ -189,7 +205,13 @@ export function advanceUntilFuture(
   fromInstantMs: number = schedule.startAt,
 ): number {
   let next = stepOnce(schedule, timeZone, fromInstantMs);
+  let steps = 0;
   while (next <= now) {
+    if (++steps > MAX_CATCHUP_STEPS) {
+      throw new Error(
+        'Schedule advancement exceeded the maximum catch-up steps — likely a corrupted or absurdly old schedule row',
+      );
+    }
     next = stepOnce(schedule, timeZone, next);
   }
   return next;
