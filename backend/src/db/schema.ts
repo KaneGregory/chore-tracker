@@ -180,6 +180,36 @@ export const choreSchedules = sqliteTable(
   ],
 );
 
+export const PATTERN_RECURRENCE_TYPES = ['every_n_days', 'weekly', 'monthly'] as const;
+export type PatternRecurrenceType = (typeof PATTERN_RECURRENCE_TYPES)[number];
+
+// Household-scoped, reusable recurrence shapes a head can apply to a chore/zone's
+// schedule via a picker (see patternService.ts) — snapshot semantics: applying one
+// just pre-fills the schedule form. There is no FK from chore_schedules back here,
+// so editing/deleting a pattern never touches a schedule that already used it.
+// Deliberately excludes 'once' from its own recurrence-type enum (rather than
+// reusing RECURRENCE_TYPES) — a one-off date isn't reusable as a named pattern.
+// No startAt/target/nextRunAt like chore_schedules — a pattern is never itself
+// evaluated by choreScheduler.ts, so startTime is plain 'HH:MM' text rather than an
+// epoch instant, and monthly's dayOfMonth is a first-class input here (unlike
+// chore_schedules, which derives it from startDate — a pattern has no date to derive
+// it from).
+export const schedulePatterns = sqliteTable('schedule_patterns', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  householdId: integer('household_id')
+    .notNull()
+    .references(() => households.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  recurrenceType: text('recurrence_type', { enum: PATTERN_RECURRENCE_TYPES }).notNull(),
+  startTime: text('start_time').notNull(),
+  intervalDays: integer('interval_days'),
+  intervalWeeks: integer('interval_weeks'),
+  weekdays: text('weekdays'),
+  intervalMonths: integer('interval_months'),
+  dayOfMonth: integer('day_of_month'),
+  createdAt: integer('created_at').notNull(),
+});
+
 export const sessions = sqliteTable('sessions', {
   token: text('token').primaryKey(),
   userId: integer('user_id')
