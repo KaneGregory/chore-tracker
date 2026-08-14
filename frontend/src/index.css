@@ -1142,3 +1142,110 @@ fieldset.form-field legend,
   gap: 8px;
   margin-top: 2px;
 }
+
+.schedule-save-as-pattern {
+  gap: 6px;
+}
+
+.schedule-save-as-pattern span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.schedule-save-as-pattern input[type='text'] {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+
+.chore-schedule-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.chore-select-checkbox {
+  display: inline-flex;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.pattern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pattern-list-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.pattern-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.pattern-summary {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.pattern-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.pattern-rename-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.pattern-rename-form input[type='text'] {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+
+.bulk-schedule-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.bulk-schedule-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bulk-schedule-result {
+  font-size: 0.85rem;
+  color: var(--accent-2);
+}
