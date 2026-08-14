@@ -1891,7 +1891,14 @@ interface BulkScheduleBarProps {
   patterns: SchedulePattern[];
   submitting: boolean;
   resultMessage: string | null;
-  onApply: (input: ScheduleInput) => void;
+  // Returns a Promise, awaited below, rather than firing-and-forgetting: the
+  // inline form (and its Save/Cancel buttons, disabled via `submitting`) must stay
+  // mounted until the actual batch of requests resolves. An earlier version closed
+  // the form the instant onApply was called, before its requests finished — which
+  // re-revealed the "Apply schedule to N selected" trigger button while the batch
+  // was still in flight, letting a user fire a second overlapping batch against the
+  // same targets.
+  onApply: (input: ScheduleInput) => Promise<void>;
   onSaveAsPattern: (input: CreatePatternInput) => void;
 }
 
@@ -1909,6 +1916,11 @@ export function BulkScheduleBar({
   const [applying, setApplying] = useState(false);
 
   if (!isHead) return null;
+
+  async function handleApply(input: ScheduleInput) {
+    await onApply(input);
+    setApplying(false);
+  }
 
   return (
     <div className="bulk-schedule-bar">
@@ -1929,10 +1941,7 @@ export function BulkScheduleBar({
           schedule={null}
           patterns={patterns}
           submitting={submitting}
-          onSave={(input) => {
-            onApply(input);
-            setApplying(false);
-          }}
+          onSave={(input) => void handleApply(input)}
           onSaveAsPattern={onSaveAsPattern}
           onCancel={() => setApplying(false)}
         />
@@ -2104,10 +2113,12 @@ Add `<BulkScheduleBar>` immediately above that `<ChoresList>` element, inside th
           patterns={patterns}
           submitting={bulkSubmitting}
           resultMessage={bulkResultMessage}
-          onApply={(input) => void handleBulkApplySchedule(input)}
+          onApply={(input) => handleBulkApplySchedule(input)}
           onSaveAsPattern={(input) => void handleSaveAsPattern(input)}
         />
 ```
+
+Note `onApply` is passed WITHOUT the `void` prefix here, unlike every other async handler in this file — `BulkScheduleBar`'s `onApply` prop is now typed `(input: ScheduleInput) => Promise<void>` (see its own file above), specifically so it can `await` this call and keep its form mounted until the batch actually finishes, rather than fire-and-forgetting it the way `onSetSchedule`/`onSaveAsPattern` do.
 
 `ScheduleInput` needs to be imported (it's already used in this file's `handleSetSchedule`); confirm `Schedule` (not just `ScheduleWithTarget`) is imported too, since `handleBulkApplySchedule`'s `updates` typing references it — both are already imported per the file's current `import type { Schedule, ScheduleInput, ScheduleWithTarget } from '../../types/schedule';` line, so no import change should be needed here specifically.
 
