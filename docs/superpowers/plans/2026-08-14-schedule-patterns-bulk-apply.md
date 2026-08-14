@@ -931,15 +931,27 @@ export function suggestStartDate(pattern: SchedulePattern, today: Date = new Dat
       const day = pattern.dayOfMonth ?? 1;
       const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-      const thisMonthDay = Math.min(day, daysInMonth(today.getFullYear(), today.getMonth() + 1));
-      const thisMonthCandidate = new Date(today.getFullYear(), today.getMonth(), thisMonthDay);
-      if (thisMonthCandidate >= todayOnly) return formatDate(thisMonthCandidate);
-
-      const nextMonthIndex = today.getMonth() + 1;
-      const nextMonthYear = today.getFullYear() + Math.floor(nextMonthIndex / 12);
-      const nextMonthZeroBased = nextMonthIndex % 12;
-      const nextMonthDay = Math.min(day, daysInMonth(nextMonthYear, nextMonthZeroBased + 1));
-      return formatDate(new Date(nextMonthYear, nextMonthZeroBased, nextMonthDay));
+      // Deliberately does NOT clamp to a short month's last day the way
+      // scheduleTime.ts's real monthly stepping does — clamping here would suggest
+      // e.g. Feb 28 for a "31st of every month" pattern, and since the eventual
+      // schedule's own dayOfMonth is derived from whatever date actually gets saved
+      // (see ChoreScheduleForm.tsx's buildPatternInput / scheduleService.ts), a
+      // clamped suggestion the user doesn't think to correct would permanently
+      // downgrade the schedule to the 28th instead of the 31st. Searching forward to
+      // the next month that actually has this day keeps the suggested date's
+      // day-of-month exactly equal to the pattern's, always.
+      for (let monthOffset = 0; monthOffset < 12; monthOffset++) {
+        const monthIndex = today.getMonth() + monthOffset;
+        const year = today.getFullYear() + Math.floor(monthIndex / 12);
+        const zeroBasedMonth = monthIndex % 12;
+        if (day > daysInMonth(year, zeroBasedMonth + 1)) continue;
+        const candidate = new Date(year, zeroBasedMonth, day);
+        if (candidate >= todayOnly) return formatDate(candidate);
+      }
+      // Unreachable for a valid dayOfMonth (1-31, enforced by patternSchemas.ts) —
+      // within any 12 consecutive months there's always at least one match. Kept as
+      // a safe fallback rather than throwing.
+      return formatDate(todayOnly);
     }
   }
 }
