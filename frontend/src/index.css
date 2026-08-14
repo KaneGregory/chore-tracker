@@ -867,11 +867,18 @@ fieldset.form-field legend,
   border-color: color-mix(in srgb, var(--error) 50%, var(--line));
 }
 
+.chore-zone-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .chore-zone-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: none;
   background: none;
   font: inherit;

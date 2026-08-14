@@ -2284,8 +2284,8 @@ Run: `npm run dev:ai` from the repo root (never `npm run dev`).
 
 Using the browser at `http://localhost:4173`:
 1. Register a household as its head, create two chores (one zoneless, one with a zone).
-2. Go to "Schedule patterns" (hamburger menu) and create one pattern of each type: `every_n_days`, `weekly` (pick 2 weekdays), `monthly` (pick a day-of-month, e.g. 31st, to exercise the clamp).
-3. Open the zoneless chore's schedule form. Confirm the "Use a pattern" picker lists all three. Selecting each one pre-fills Repeats/Every/weekdays/At correctly, and Date gets a sensible suggested value for each (today for every_n_days; the next matching weekday for weekly; the next occurrence of that day-of-month, clamped if the current month is short, for monthly).
+2. Go to "Schedule patterns" (hamburger menu) and create one pattern of each type: `every_n_days`, `weekly` (pick 2 weekdays), `monthly` (pick a day-of-month, e.g. 31st, to exercise the non-clamping search-forward behavior).
+3. Open the zoneless chore's schedule form. Confirm the "Use a pattern" picker lists all three. Selecting each one pre-fills Repeats/Every/weekdays/At correctly, and Date gets a sensible suggested value for each (today for every_n_days; the next matching weekday for weekly; the next month that actually has that day-of-month — never clamped to a short month's last day, see the comment in suggestStartDate.ts — for monthly).
 4. Save a schedule with "Save as a reusable pattern" checked and a name; confirm it now appears on the Schedule patterns page with the right summary.
 5. Rename and then remove one pattern from that page; confirm the picker in the schedule form reflects both changes without a page reload.
 6. Click "Select chores." Confirm a checkbox appears next to the zoneless chore's own schedule control and next to the zoned chore's zone (but never next to the zoned chore's own row, which can't carry its own schedule).

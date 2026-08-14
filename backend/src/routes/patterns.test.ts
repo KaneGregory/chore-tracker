@@ -221,4 +221,110 @@ describe('schedule patterns', () => {
     expect(response.status).toBe(404);
     expect(response.body.error).toBe('HouseholdNotFound');
   });
+
+  it('404s renaming a pattern that belongs to a different household', async () => {
+    const headA = await registerHeadOfHousehold('pattern-cross-a-hoh@example.com', 'Cross Pattern House A');
+    const headB = await registerHeadOfHousehold('pattern-cross-b-hoh@example.com', 'Cross Pattern House B');
+    const createResponse = await request(app)
+      .post(`/api/households/${headA.householdId}/patterns`)
+      .set('Cookie', headA.cookie)
+      .send({ recurrenceType: 'every_n_days', name: 'House A pattern', startTime: '09:00', intervalDays: 1 });
+    const patternId = createResponse.body.pattern.id;
+
+    const response = await request(app)
+      .patch(`/api/households/${headB.householdId}/patterns/${patternId}`)
+      .set('Cookie', headB.cookie)
+      .send({ name: 'Stolen name' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('PatternNotFound');
+  });
+
+  it('404s removing a pattern that belongs to a different household', async () => {
+    const headA = await registerHeadOfHousehold('pattern-cross-del-a-hoh@example.com', 'Cross Del Pattern House A');
+    const headB = await registerHeadOfHousehold('pattern-cross-del-b-hoh@example.com', 'Cross Del Pattern House B');
+    const createResponse = await request(app)
+      .post(`/api/households/${headA.householdId}/patterns`)
+      .set('Cookie', headA.cookie)
+      .send({ recurrenceType: 'every_n_days', name: 'House A pattern to remove', startTime: '09:00', intervalDays: 1 });
+    const patternId = createResponse.body.pattern.id;
+
+    const response = await request(app)
+      .delete(`/api/households/${headB.householdId}/patterns/${patternId}`)
+      .set('Cookie', headB.cookie);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('PatternNotFound');
+  });
+
+  it('rejects a non-head member renaming a pattern with 403', async () => {
+    const head = await registerHeadOfHousehold('pattern-rename-member-hoh@example.com', 'Rename Member House');
+    const member = await registerAndJoin('pattern-rename-member@example.com', head);
+    const createResponse = await request(app)
+      .post(`/api/households/${head.householdId}/patterns`)
+      .set('Cookie', head.cookie)
+      .send({ recurrenceType: 'every_n_days', name: 'Head only', startTime: '09:00', intervalDays: 1 });
+    const patternId = createResponse.body.pattern.id;
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/patterns/${patternId}`)
+      .set('Cookie', member.cookie)
+      .send({ name: 'Renamed by member' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('rejects a non-head member removing a pattern with 403', async () => {
+    const head = await registerHeadOfHousehold('pattern-remove-member-hoh@example.com', 'Remove Member House');
+    const member = await registerAndJoin('pattern-remove-member@example.com', head);
+    const createResponse = await request(app)
+      .post(`/api/households/${head.householdId}/patterns`)
+      .set('Cookie', head.cookie)
+      .send({ recurrenceType: 'every_n_days', name: 'Head only to remove', startTime: '09:00', intervalDays: 1 });
+    const patternId = createResponse.body.pattern.id;
+
+    const response = await request(app)
+      .delete(`/api/households/${head.householdId}/patterns/${patternId}`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('NotHeadOfHousehold');
+  });
+
+  it('rejects a monthly pattern with an out-of-range dayOfMonth with 400', async () => {
+    const head = await registerHeadOfHousehold('pattern-invalid-day-hoh@example.com', 'Invalid Day House');
+
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/patterns`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'monthly',
+        name: 'Invalid day of month',
+        startTime: '09:00',
+        intervalMonths: 1,
+        dayOfMonth: 32,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
+  });
+
+  it('dedupes and sorts weekly pattern weekdays', async () => {
+    const head = await registerHeadOfHousehold('pattern-weekday-dedup-hoh@example.com', 'Weekday Dedup House');
+
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/patterns`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'weekly',
+        name: 'Dedup weekdays',
+        startTime: '08:00',
+        intervalWeeks: 1,
+        weekdays: [5, 1, 5, 3],
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.pattern.weekdays).toEqual([1, 3, 5]);
+  });
 });

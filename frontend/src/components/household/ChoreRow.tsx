@@ -143,6 +143,7 @@ export function ChoreRow({
                 type="checkbox"
                 checked={selectedTargets.has(scheduleKey)}
                 onChange={() => onToggleTarget(chore.id, null)}
+                aria-label={`Select ${chore.name}`}
               />
             </label>
           )}
