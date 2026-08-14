@@ -1055,6 +1055,36 @@ fieldset.form-field legend,
   color: var(--muted);
 }
 
+.chore-schedule-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.chore-schedule-icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
+  color: var(--accent-2);
+}
+
+.chore-schedule-icon-btn-remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error) 18%, transparent);
+  color: var(--error);
+}
+
+.chore-schedule-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .chore-schedule-form {
   display: flex;
   flex-direction: column;

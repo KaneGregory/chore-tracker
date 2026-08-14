@@ -68,8 +68,14 @@ export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: Ch
         </select>
       </label>
 
-      <FormField label="Start date" name="scheduleStartDate" type="date" value={startDate} onChange={setStartDate} required />
-      <FormField label="Time" name="scheduleStartTime" type="time" value={startTime} onChange={setStartTime} required />
+      <FormField
+        label={recurrenceType === 'once' ? 'Date' : 'Start date'}
+        name="scheduleStartDate"
+        type="date"
+        value={startDate}
+        onChange={setStartDate}
+        required
+      />
 
       {recurrenceType === 'every_n_days' && (
         <label className="schedule-field">
@@ -122,6 +128,8 @@ export function ChoreScheduleForm({ schedule, submitting, onSave, onCancel }: Ch
           month(s), on the day of month above
         </label>
       )}
+
+      <FormField label="At" name="scheduleStartTime" type="time" value={startTime} onChange={setStartTime} required />
 
       <div className="schedule-form-actions">
         <button type="submit" className="btn btn-pill-outline" disabled={submitting}>

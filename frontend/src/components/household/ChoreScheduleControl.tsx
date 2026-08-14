@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPenToSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
@@ -45,14 +47,30 @@ export function ChoreScheduleControl({
   return (
     <div className="chore-schedule-control">
       {schedule && <span className="chore-schedule-summary">{RECURRENCE_SUMMARY[schedule.recurrenceType](schedule)}</span>}
-      {isHead && (
+      {isHead && !schedule && (
         <button type="button" className="btn btn-text" onClick={() => setEditing(true)}>
-          {schedule ? 'Edit schedule' : 'Add schedule'}
+          Add schedule
         </button>
       )}
       {isHead && schedule && (
-        <button type="button" className="btn btn-text" disabled={submitting} onClick={onRemove}>
-          Remove schedule
+        <button
+          type="button"
+          className="chore-schedule-icon-btn"
+          onClick={() => setEditing(true)}
+          aria-label="Edit schedule"
+        >
+          <FontAwesomeIcon icon={faPenToSquare} />
+        </button>
+      )}
+      {isHead && schedule && (
+        <button
+          type="button"
+          className="chore-schedule-icon-btn chore-schedule-icon-btn-remove"
+          disabled={submitting}
+          onClick={onRemove}
+          aria-label="Remove schedule"
+        >
+          <FontAwesomeIcon icon={faXmark} />
         </button>
       )}
     </div>
