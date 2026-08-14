@@ -11,7 +11,14 @@ interface BulkScheduleBarProps {
   patterns: SchedulePattern[];
   submitting: boolean;
   resultMessage: string | null;
-  onApply: (input: ScheduleInput) => void;
+  // Returns a Promise, awaited below, rather than firing-and-forgetting: the
+  // inline form (and its Save/Cancel buttons, disabled via `submitting`) must stay
+  // mounted until the actual batch of requests resolves. An earlier version closed
+  // the form the instant onApply was called, before its requests finished — which
+  // re-revealed the "Apply schedule to N selected" trigger button while the batch
+  // was still in flight, letting a user fire a second overlapping batch against the
+  // same targets.
+  onApply: (input: ScheduleInput) => Promise<void>;
   onSaveAsPattern: (input: CreatePatternInput) => void;
 }
 
@@ -27,6 +34,11 @@ export function BulkScheduleBar({
   onSaveAsPattern,
 }: BulkScheduleBarProps) {
   const [applying, setApplying] = useState(false);
+
+  async function handleApply(input: ScheduleInput) {
+    await onApply(input);
+    setApplying(false);
+  }
 
   if (!isHead) return null;
 
@@ -49,10 +61,7 @@ export function BulkScheduleBar({
           schedule={null}
           patterns={patterns}
           submitting={submitting}
-          onSave={(input) => {
-            onApply(input);
-            setApplying(false);
-          }}
+          onSave={(input) => void handleApply(input)}
           onSaveAsPattern={onSaveAsPattern}
           onCancel={() => setApplying(false)}
         />

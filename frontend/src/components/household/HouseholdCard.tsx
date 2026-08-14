@@ -330,7 +330,10 @@ export function HouseholdCard({
             patterns={patterns}
             submitting={bulkSubmitting}
             resultMessage={bulkResultMessage}
-            onApply={(input) => void handleBulkApplySchedule(input)}
+            // Deliberately not void-wrapped, unlike every other async handler here:
+            // BulkScheduleBar awaits this promise to keep its inline form mounted
+            // until the batch actually resolves (see BulkScheduleBar.tsx).
+            onApply={(input) => handleBulkApplySchedule(input)}
             onSaveAsPattern={(input) => void handleSaveAsPattern(input)}
           />
           <ChoresList
