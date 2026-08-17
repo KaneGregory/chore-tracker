@@ -8,7 +8,7 @@ import { HomePage } from './pages/HomePage';
 import { CreateChorePage } from './pages/CreateChorePage';
 import { ZonesPage } from './pages/ZonesPage';
 import { MembersPage } from './pages/MembersPage';
-import { SchedulePatternsPage } from './pages/SchedulePatternsPage';
+import { SchedulesPage } from './pages/SchedulesPage';
 
 function App() {
   return (
@@ -20,10 +20,10 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<HomePage />} />
-              <Route path="/households/:householdId/chores/new" element={<CreateChorePage />} />
-              <Route path="/households/:householdId/zones" element={<ZonesPage />} />
-              <Route path="/households/:householdId/members" element={<MembersPage />} />
-              <Route path="/households/:householdId/patterns" element={<SchedulePatternsPage />} />
+              <Route path="/chores/new" element={<CreateChorePage />} />
+              <Route path="/zones" element={<ZonesPage />} />
+              <Route path="/members" element={<MembersPage />} />
+              <Route path="/schedules" element={<SchedulesPage />} />
             </Route>
           </Routes>
         </AppShell>

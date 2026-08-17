@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { PatternForm } from '../components/household/PatternForm';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -13,10 +13,10 @@ const RECURRENCE_LABEL: Record<SchedulePattern['recurrenceType'], (pattern: Sche
   monthly: (pattern) => `Every ${pattern.intervalMonths} month(s) on day ${pattern.dayOfMonth} at ${pattern.startTime}`,
 };
 
-export function SchedulePatternsPage() {
-  const { householdId: householdIdParam } = useParams();
-  const householdId = Number(householdIdParam);
+export function SchedulesPage() {
   const { state } = useAuth();
+  const household = state.status === 'authenticated' ? state.households[0] : undefined;
+  const householdId = household?.id;
 
   const [patterns, setPatterns] = useState<SchedulePattern[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,13 +24,8 @@ export function SchedulePatternsPage() {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
-  const household =
-    state.status === 'authenticated'
-      ? state.households.find((candidate) => candidate.id === householdId)
-      : undefined;
-
   useEffect(() => {
-    if (!household) return;
+    if (!householdId) return;
     let cancelled = false;
     patternApi
       .listPatterns(householdId)
@@ -45,9 +40,10 @@ export function SchedulePatternsPage() {
     return () => {
       cancelled = true;
     };
-  }, [householdId, household]);
+  }, [householdId]);
 
   async function handleCreate(input: CreatePatternInput) {
+    if (!householdId) return;
     setBusy(true);
     setError(null);
     try {
@@ -61,6 +57,7 @@ export function SchedulePatternsPage() {
   }
 
   async function handleRename(patternId: number) {
+    if (!householdId) return;
     const trimmed = renameValue.trim();
     if (!trimmed) return;
     setBusy(true);
@@ -77,6 +74,7 @@ export function SchedulePatternsPage() {
   }
 
   async function handleRemove(patternId: number) {
+    if (!householdId) return;
     setBusy(true);
     setError(null);
     try {
@@ -97,7 +95,7 @@ export function SchedulePatternsPage() {
 
   return (
     <div className="card">
-      <h1>Schedule patterns</h1>
+      <h1>Schedules</h1>
       <p className="card-eyebrow">For {household.name}</p>
       <ErrorBanner message={error} />
       {patterns ? (

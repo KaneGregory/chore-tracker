@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { ZoneTree } from '../components/household/ZoneTree';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -9,21 +9,16 @@ import { flattenZones } from '../utils/zoneTree';
 import type { Zone } from '../types/zone';
 
 export function ZonesPage() {
-  const { householdId: householdIdParam } = useParams();
-  const householdId = Number(householdIdParam);
   const { state } = useAuth();
+  const household = state.status === 'authenticated' ? state.households[0] : undefined;
+  const householdId = household?.id;
 
   const [zoneTree, setZoneTree] = useState<Zone | null>(null);
   const [zoneError, setZoneError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const household =
-    state.status === 'authenticated'
-      ? state.households.find((candidate) => candidate.id === householdId)
-      : undefined;
-
   useEffect(() => {
-    if (!household) return;
+    if (!householdId) return;
     let cancelled = false;
     zoneApi
       .getZoneTree(householdId)
@@ -38,9 +33,10 @@ export function ZonesPage() {
     return () => {
       cancelled = true;
     };
-  }, [householdId, household]);
+  }, [householdId]);
 
   async function handleCreateZone(parentZoneId: number, name: string) {
+    if (!householdId) return;
     setBusy(true);
     setZoneError(null);
     try {
@@ -53,6 +49,7 @@ export function ZonesPage() {
   }
 
   async function handleRemoveZone(zoneId: number) {
+    if (!householdId) return;
     setBusy(true);
     setZoneError(null);
     try {
@@ -65,6 +62,7 @@ export function ZonesPage() {
   }
 
   async function handleMoveZone(zoneId: number, newParentZoneId: number) {
+    if (!householdId) return;
     setBusy(true);
     setZoneError(null);
     try {

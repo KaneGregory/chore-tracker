@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { CreateChoreForm } from '../components/household/CreateChoreForm';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -9,9 +9,9 @@ import { ApiError } from '../api/httpClient';
 import type { Zone } from '../types/zone';
 
 export function CreateChorePage() {
-  const { householdId: householdIdParam } = useParams();
-  const householdId = Number(householdIdParam);
   const { state } = useAuth();
+  const household = state.status === 'authenticated' ? state.households[0] : undefined;
+  const householdId = household?.id;
   const navigate = useNavigate();
 
   const [zoneTree, setZoneTree] = useState<Zone | null>(null);
@@ -19,13 +19,8 @@ export function CreateChorePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const household =
-    state.status === 'authenticated'
-      ? state.households.find((candidate) => candidate.id === householdId)
-      : undefined;
-
   useEffect(() => {
-    if (!household) return;
+    if (!householdId) return;
     let cancelled = false;
     zoneApi
       .getZoneTree(householdId)
@@ -40,9 +35,10 @@ export function CreateChorePage() {
     return () => {
       cancelled = true;
     };
-  }, [householdId, household]);
+  }, [householdId]);
 
   async function handleSubmit(name: string, zoneIds: number[]) {
+    if (!householdId) return;
     setSubmitting(true);
     setSubmitError(null);
     try {

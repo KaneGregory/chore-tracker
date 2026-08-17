@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { MembersList } from '../components/household/MembersList';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -12,9 +12,9 @@ function formatJoinCode(code: string): string {
 }
 
 export function MembersPage() {
-  const { householdId: householdIdParam } = useParams();
-  const householdId = Number(householdIdParam);
   const { state } = useAuth();
+  const household = state.status === 'authenticated' ? state.households[0] : undefined;
+  const householdId = household?.id;
 
   const [members, setMembers] = useState<HouseholdMember[] | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
@@ -26,13 +26,8 @@ export function MembersPage() {
   const [creatingMember, setCreatingMember] = useState(false);
   const [resolvingPendingKey, setResolvingPendingKey] = useState<string | null>(null);
 
-  const household =
-    state.status === 'authenticated'
-      ? state.households.find((candidate) => candidate.id === householdId)
-      : undefined;
-
   useEffect(() => {
-    if (!household) return;
+    if (!householdId) return;
     let cancelled = false;
     householdApi
       .listMembers(householdId)
@@ -47,7 +42,7 @@ export function MembersPage() {
     return () => {
       cancelled = true;
     };
-  }, [householdId, household]);
+  }, [householdId]);
 
   useEffect(() => {
     if (!copied) return;
@@ -66,6 +61,7 @@ export function MembersPage() {
   }
 
   async function handlePromote(userId: number) {
+    if (!householdId) return;
     setPromotingId(userId);
     setMembersError(null);
     try {
@@ -79,6 +75,7 @@ export function MembersPage() {
   }
 
   async function handleDemote(userId: number) {
+    if (!householdId) return;
     setDemotingId(userId);
     setMembersError(null);
     try {
@@ -92,6 +89,7 @@ export function MembersPage() {
   }
 
   async function handleApprove(userId: number) {
+    if (!householdId) return;
     setResolvingPendingKey(`${userId}:approve`);
     setMembersError(null);
     try {
@@ -104,6 +102,7 @@ export function MembersPage() {
   }
 
   async function handleDecline(userId: number) {
+    if (!householdId) return;
     setResolvingPendingKey(`${userId}:decline`);
     setMembersError(null);
     try {
@@ -118,6 +117,7 @@ export function MembersPage() {
   }
 
   async function handleAssign(userId: number, targetMemberId: number) {
+    if (!householdId) return;
     setResolvingPendingKey(`${userId}:assign`);
     setMembersError(null);
     try {
@@ -132,7 +132,7 @@ export function MembersPage() {
   async function handleCreateMember(event: FormEvent) {
     event.preventDefault();
     const trimmed = newMemberUsername.trim();
-    if (!trimmed) return;
+    if (!trimmed || !householdId) return;
     setCreatingMember(true);
     setMembersError(null);
     try {

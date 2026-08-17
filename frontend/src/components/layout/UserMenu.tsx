@@ -58,26 +58,14 @@ export function UserMenu() {
           </Link>
           {household && (
             <>
-              <Link
-                role="menuitem"
-                to={`/households/${household.id}/zones`}
-                onClick={() => setIsOpen(false)}
-              >
+              <Link role="menuitem" to="/zones" onClick={() => setIsOpen(false)}>
                 Zones
               </Link>
-              <Link
-                role="menuitem"
-                to={`/households/${household.id}/members`}
-                onClick={() => setIsOpen(false)}
-              >
+              <Link role="menuitem" to="/members" onClick={() => setIsOpen(false)}>
                 Members
               </Link>
-              <Link
-                role="menuitem"
-                to={`/households/${household.id}/patterns`}
-                onClick={() => setIsOpen(false)}
-              >
-                Schedule patterns
+              <Link role="menuitem" to="/schedules" onClick={() => setIsOpen(false)}>
+                Schedules
               </Link>
             </>
           )}
