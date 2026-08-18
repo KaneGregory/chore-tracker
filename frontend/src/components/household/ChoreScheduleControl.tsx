@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPenToSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
+import { formatWeekdays } from '../../utils/weekdayLabels';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
 interface ChoreScheduleControlProps {
@@ -18,7 +19,8 @@ interface ChoreScheduleControlProps {
 const RECURRENCE_SUMMARY: Record<Schedule['recurrenceType'], (schedule: Schedule) => string> = {
   once: (schedule) => `Scheduled for ${schedule.startDate}`,
   every_n_days: (schedule) => `Repeats every ${schedule.intervalDays} day(s)`,
-  weekly: (schedule) => `Repeats every ${schedule.intervalWeeks} week(s)`,
+  weekly: (schedule) =>
+    `Repeats every ${schedule.intervalWeeks} week(s) on ${formatWeekdays(schedule.weekdays)}`,
   monthly: (schedule) => `Repeats every ${schedule.intervalMonths} month(s)`,
 };
 

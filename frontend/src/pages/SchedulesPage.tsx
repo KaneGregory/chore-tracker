@@ -5,10 +5,12 @@ import { ErrorBanner } from '../components/common/ErrorBanner';
 import * as scheduleTemplateApi from '../api/scheduleTemplateApi';
 import { ApiError } from '../api/httpClient';
 import type { ScheduleTemplate } from '../types/scheduleTemplate';
+import { formatWeekdays } from '../utils/weekdayLabels';
 
 const RECURRENCE_LABEL: Record<ScheduleTemplate['recurrenceType'], (template: ScheduleTemplate) => string> = {
   every_n_days: (template) => `Every ${template.intervalDays} day(s) at ${template.startTime}`,
-  weekly: (template) => `Every ${template.intervalWeeks} week(s) at ${template.startTime}`,
+  weekly: (template) =>
+    `Every ${template.intervalWeeks} week(s) on ${formatWeekdays(template.weekdays)} at ${template.startTime}`,
   monthly: (template) =>
     `Every ${template.intervalMonths} month(s) on day ${template.dayOfMonth} at ${template.startTime}`,
 };
