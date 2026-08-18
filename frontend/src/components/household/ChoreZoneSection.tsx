@@ -132,12 +132,6 @@ export function ChoreZoneSection({
             unassigningId={unassigningId}
             onUnassign={onUnassign}
           />
-          <ChoreStatusActions
-            status={zone.status}
-            isHead={isHead}
-            disabled={isUpdatingStatus}
-            onSetStatus={(status) => onSetStatus(choreId, zone.zoneId, status)}
-          />
           <div className="chore-schedule-row">
             <ChoreScheduleControl
               schedule={scheduleByTarget.get(scheduleKey) ?? null}
@@ -149,6 +143,12 @@ export function ChoreZoneSection({
               onRemove={() => onRemoveSchedule(choreId, zone.zoneId)}
             />
           </div>
+          <ChoreStatusActions
+            status={zone.status}
+            isHead={isHead}
+            disabled={isUpdatingStatus}
+            onSetStatus={(status) => onSetStatus(choreId, zone.zoneId, status)}
+          />
         </div>
       )}
     </li>

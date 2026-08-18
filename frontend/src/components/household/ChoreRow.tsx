@@ -127,15 +127,6 @@ export function ChoreRow({
         />
       </div>
       {!hasZones && (
-        <ChoreStatusActions
-          status={displayStatus}
-          isHead={isHead}
-          disabled={isUpdatingStatus}
-          onSetStatus={(status) => onSetStatus(chore.id, null, status)}
-          className="chore-status-row"
-        />
-      )}
-      {!hasZones && (
         <div className="chore-schedule-row">
           {selectMode && (
             <label className="chore-select-checkbox">
@@ -157,6 +148,15 @@ export function ChoreRow({
             onRemove={() => onRemoveSchedule(chore.id, null)}
           />
         </div>
+      )}
+      {!hasZones && (
+        <ChoreStatusActions
+          status={displayStatus}
+          isHead={isHead}
+          disabled={isUpdatingStatus}
+          onSetStatus={(status) => onSetStatus(chore.id, null, status)}
+          className="chore-status-row"
+        />
       )}
       {hasZones && (
         <ul className="chore-zones">
