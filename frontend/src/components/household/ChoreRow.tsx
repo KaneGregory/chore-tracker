@@ -6,7 +6,7 @@ import { ChoreStatusActions } from './ChoreStatusActions';
 import { ChoreScheduleControl } from './ChoreScheduleControl';
 import { ChoreZoneSection } from './ChoreZoneSection';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
-import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreRowProps {
@@ -29,8 +29,8 @@ interface ChoreRowProps {
   scheduleSubmittingKey: string | null;
   onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
-  patterns: SchedulePattern[];
-  onSaveAsPattern: (input: CreatePatternInput) => void;
+  scheduleTemplates: ScheduleTemplate[];
+  onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
   selectMode: boolean;
   selectedTargets: Set<string>;
   onToggleTarget: (choreId: number, zoneId: number | null) => void;
@@ -56,8 +56,8 @@ export function ChoreRow({
   scheduleSubmittingKey,
   onSetSchedule,
   onRemoveSchedule,
-  patterns,
-  onSaveAsPattern,
+  scheduleTemplates,
+  onSaveAsScheduleTemplate,
   selectMode,
   selectedTargets,
   onToggleTarget,
@@ -149,11 +149,11 @@ export function ChoreRow({
           )}
           <ChoreScheduleControl
             schedule={scheduleByTarget.get(scheduleKey) ?? null}
-            patterns={patterns}
+            scheduleTemplates={scheduleTemplates}
             isHead={isHead}
             submitting={scheduleSubmittingKey === scheduleKey}
             onSave={(input) => onSetSchedule(chore.id, null, input)}
-            onSaveAsPattern={onSaveAsPattern}
+            onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
             onRemove={() => onRemoveSchedule(chore.id, null)}
           />
         </div>
@@ -180,8 +180,8 @@ export function ChoreRow({
               scheduleSubmittingKey={scheduleSubmittingKey}
               onSetSchedule={onSetSchedule}
               onRemoveSchedule={onRemoveSchedule}
-              patterns={patterns}
-              onSaveAsPattern={onSaveAsPattern}
+              scheduleTemplates={scheduleTemplates}
+              onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
               selectMode={selectMode}
               selectedTargets={selectedTargets}
               onToggleTarget={onToggleTarget}

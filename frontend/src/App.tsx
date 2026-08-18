@@ -9,6 +9,7 @@ import { CreateChorePage } from './pages/CreateChorePage';
 import { ZonesPage } from './pages/ZonesPage';
 import { MembersPage } from './pages/MembersPage';
 import { SchedulesPage } from './pages/SchedulesPage';
+import { CreateSchedulePage } from './pages/CreateSchedulePage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
               <Route path="/zones" element={<ZonesPage />} />
               <Route path="/members" element={<MembersPage />} />
               <Route path="/schedules" element={<SchedulesPage />} />
+              <Route path="/schedules/new" element={<CreateSchedulePage />} />
             </Route>
           </Routes>
         </AppShell>

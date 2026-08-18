@@ -5,7 +5,7 @@ import { AssignmentChips } from './AssignmentChips';
 import { ChoreStatusActions } from './ChoreStatusActions';
 import { ChoreScheduleControl } from './ChoreScheduleControl';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
-import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { CHORE_STATUS_LABEL } from '../../utils/choreStatus';
 
 interface ChoreZoneSectionProps {
@@ -26,8 +26,8 @@ interface ChoreZoneSectionProps {
   scheduleSubmittingKey: string | null;
   onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) => void;
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
-  patterns: SchedulePattern[];
-  onSaveAsPattern: (input: CreatePatternInput) => void;
+  scheduleTemplates: ScheduleTemplate[];
+  onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
   selectMode: boolean;
   selectedTargets: Set<string>;
   onToggleTarget: (choreId: number, zoneId: number | null) => void;
@@ -51,8 +51,8 @@ export function ChoreZoneSection({
   scheduleSubmittingKey,
   onSetSchedule,
   onRemoveSchedule,
-  patterns,
-  onSaveAsPattern,
+  scheduleTemplates,
+  onSaveAsScheduleTemplate,
   selectMode,
   selectedTargets,
   onToggleTarget,
@@ -141,11 +141,11 @@ export function ChoreZoneSection({
           <div className="chore-schedule-row">
             <ChoreScheduleControl
               schedule={scheduleByTarget.get(scheduleKey) ?? null}
-              patterns={patterns}
+              scheduleTemplates={scheduleTemplates}
               isHead={isHead}
               submitting={scheduleSubmittingKey === scheduleKey}
               onSave={(input) => onSetSchedule(choreId, zone.zoneId, input)}
-              onSaveAsPattern={onSaveAsPattern}
+              onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
               onRemove={() => onRemoveSchedule(choreId, zone.zoneId)}
             />
           </div>

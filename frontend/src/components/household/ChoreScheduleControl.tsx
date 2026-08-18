@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPenToSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
-import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
 interface ChoreScheduleControlProps {
@@ -11,8 +11,8 @@ interface ChoreScheduleControlProps {
   submitting: boolean;
   onSave: (input: ScheduleInput) => void;
   onRemove: () => void;
-  patterns: SchedulePattern[];
-  onSaveAsPattern: (input: CreatePatternInput) => void;
+  scheduleTemplates: ScheduleTemplate[];
+  onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
 }
 
 const RECURRENCE_SUMMARY: Record<Schedule['recurrenceType'], (schedule: Schedule) => string> = {
@@ -28,8 +28,8 @@ export function ChoreScheduleControl({
   submitting,
   onSave,
   onRemove,
-  patterns,
-  onSaveAsPattern,
+  scheduleTemplates,
+  onSaveAsScheduleTemplate,
 }: ChoreScheduleControlProps) {
   const [editing, setEditing] = useState(false);
 
@@ -39,13 +39,13 @@ export function ChoreScheduleControl({
     return (
       <ChoreScheduleForm
         schedule={schedule}
-        patterns={patterns}
+        scheduleTemplates={scheduleTemplates}
         submitting={submitting}
         onSave={(input) => {
           onSave(input);
           setEditing(false);
         }}
-        onSaveAsPattern={onSaveAsPattern}
+        onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
         onCancel={() => setEditing(false)}
       />
     );

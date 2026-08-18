@@ -1,15 +1,15 @@
 import { useState, type FormEvent } from 'react';
 import type { RecurrenceType, Schedule, ScheduleInput } from '../../types/schedule';
-import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { FormField } from '../common/FormField';
 import { suggestStartDate } from '../../utils/suggestStartDate';
 
 interface ChoreScheduleFormProps {
   schedule: Schedule | null;
-  patterns: SchedulePattern[];
+  scheduleTemplates: ScheduleTemplate[];
   submitting: boolean;
   onSave: (input: ScheduleInput) => void;
-  onSaveAsPattern: (input: CreatePatternInput) => void;
+  onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
   onCancel: () => void;
 }
 
@@ -17,10 +17,10 @@ const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function ChoreScheduleForm({
   schedule,
-  patterns,
+  scheduleTemplates,
   submitting,
   onSave,
-  onSaveAsPattern,
+  onSaveAsScheduleTemplate,
   onCancel,
 }: ChoreScheduleFormProps) {
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(schedule?.recurrenceType ?? 'once');
@@ -30,8 +30,8 @@ export function ChoreScheduleForm({
   const [intervalWeeks, setIntervalWeeks] = useState(schedule?.intervalWeeks ?? 1);
   const [weekdays, setWeekdays] = useState<Set<number>>(new Set(schedule?.weekdays ?? []));
   const [intervalMonths, setIntervalMonths] = useState(schedule?.intervalMonths ?? 1);
-  const [saveAsPattern, setSaveAsPattern] = useState(false);
-  const [patternName, setPatternName] = useState('');
+  const [saveAsScheduleTemplate, setSaveAsScheduleTemplate] = useState(false);
+  const [scheduleTemplateName, setScheduleTemplateName] = useState('');
 
   function toggleWeekday(day: number) {
     setWeekdays((prev) => {
@@ -45,26 +45,26 @@ export function ChoreScheduleForm({
     });
   }
 
-  // Pre-fills every field a pattern carries, plus a suggested Date the user can
-  // still change before saving — see suggestStartDate.ts.
-  function applyPattern(patternId: string) {
-    const pattern = patterns.find((candidate) => String(candidate.id) === patternId);
-    if (!pattern) return;
+  // Pre-fills every field a schedule template carries, plus a suggested Date the
+  // user can still change before saving — see suggestStartDate.ts.
+  function applyScheduleTemplate(scheduleTemplateId: string) {
+    const template = scheduleTemplates.find((candidate) => String(candidate.id) === scheduleTemplateId);
+    if (!template) return;
 
-    setRecurrenceType(pattern.recurrenceType);
-    setStartTime(pattern.startTime);
-    if (pattern.intervalDays !== null) setIntervalDays(pattern.intervalDays);
-    if (pattern.intervalWeeks !== null) setIntervalWeeks(pattern.intervalWeeks);
-    if (pattern.weekdays !== null) setWeekdays(new Set(pattern.weekdays));
-    if (pattern.intervalMonths !== null) setIntervalMonths(pattern.intervalMonths);
-    setStartDate(suggestStartDate(pattern));
+    setRecurrenceType(template.recurrenceType);
+    setStartTime(template.startTime);
+    if (template.intervalDays !== null) setIntervalDays(template.intervalDays);
+    if (template.intervalWeeks !== null) setIntervalWeeks(template.intervalWeeks);
+    if (template.weekdays !== null) setWeekdays(new Set(template.weekdays));
+    if (template.intervalMonths !== null) setIntervalMonths(template.intervalMonths);
+    setStartDate(suggestStartDate(template));
   }
 
-  // Mirrors scheduleService.ts's buildRowValues: dayOfMonth for a saved pattern is
-  // derived from the form's current Date, the same rule the backend already applies
-  // when saving the schedule itself — there is no separate dayOfMonth field/state to
-  // keep in sync.
-  function buildPatternInput(name: string): CreatePatternInput | null {
+  // Mirrors scheduleService.ts's buildRowValues: dayOfMonth for a saved schedule
+  // template is derived from the form's current Date, the same rule the backend
+  // already applies when saving the schedule itself — there is no separate
+  // dayOfMonth field/state to keep in sync.
+  function buildScheduleTemplateInput(name: string): CreateScheduleTemplateInput | null {
     switch (recurrenceType) {
       case 'every_n_days':
         return { recurrenceType, name, startTime, intervalDays };
@@ -103,25 +103,25 @@ export function ChoreScheduleForm({
         break;
     }
 
-    const trimmedName = patternName.trim();
-    if (saveAsPattern && trimmedName) {
-      const patternInput = buildPatternInput(trimmedName);
-      if (patternInput) onSaveAsPattern(patternInput);
+    const trimmedName = scheduleTemplateName.trim();
+    if (saveAsScheduleTemplate && trimmedName) {
+      const scheduleTemplateInput = buildScheduleTemplateInput(trimmedName);
+      if (scheduleTemplateInput) onSaveAsScheduleTemplate(scheduleTemplateInput);
     }
   }
 
   return (
     <form className="chore-schedule-form" onSubmit={handleSubmit}>
-      {patterns.length > 0 && (
+      {scheduleTemplates.length > 0 && (
         <label className="schedule-field">
-          Use a pattern
-          <select defaultValue="" onChange={(event) => applyPattern(event.target.value)}>
+          Use a saved schedule
+          <select defaultValue="" onChange={(event) => applyScheduleTemplate(event.target.value)}>
             <option value="" disabled>
-              Choose a saved pattern…
+              Choose a saved schedule…
             </option>
-            {patterns.map((pattern) => (
-              <option key={pattern.id} value={pattern.id}>
-                {pattern.name}
+            {scheduleTemplates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
               </option>
             ))}
           </select>
@@ -205,21 +205,21 @@ export function ChoreScheduleForm({
       <FormField label="At" name="scheduleStartTime" type="time" value={startTime} onChange={setStartTime} required />
 
       {recurrenceType !== 'once' && (
-        <label className="schedule-field schedule-save-as-pattern">
+        <label className="schedule-field schedule-save-as-template">
           <span>
             <input
               type="checkbox"
-              checked={saveAsPattern}
-              onChange={(event) => setSaveAsPattern(event.target.checked)}
+              checked={saveAsScheduleTemplate}
+              onChange={(event) => setSaveAsScheduleTemplate(event.target.checked)}
             />
-            Save as a reusable pattern
+            Save as a reusable schedule
           </span>
-          {saveAsPattern && (
+          {saveAsScheduleTemplate && (
             <input
               type="text"
-              placeholder="Pattern name"
-              value={patternName}
-              onChange={(event) => setPatternName(event.target.value)}
+              placeholder="Schedule name"
+              value={scheduleTemplateName}
+              onChange={(event) => setScheduleTemplateName(event.target.value)}
               required
             />
           )}

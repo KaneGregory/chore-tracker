@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
-import { PatternForm } from '../components/household/PatternForm';
 import { ErrorBanner } from '../components/common/ErrorBanner';
-import * as patternApi from '../api/patternApi';
+import * as scheduleTemplateApi from '../api/scheduleTemplateApi';
 import { ApiError } from '../api/httpClient';
-import type { CreatePatternInput, SchedulePattern } from '../types/pattern';
+import type { ScheduleTemplate } from '../types/scheduleTemplate';
 
-const RECURRENCE_LABEL: Record<SchedulePattern['recurrenceType'], (pattern: SchedulePattern) => string> = {
-  every_n_days: (pattern) => `Every ${pattern.intervalDays} day(s) at ${pattern.startTime}`,
-  weekly: (pattern) => `Every ${pattern.intervalWeeks} week(s) at ${pattern.startTime}`,
-  monthly: (pattern) => `Every ${pattern.intervalMonths} month(s) on day ${pattern.dayOfMonth} at ${pattern.startTime}`,
+const RECURRENCE_LABEL: Record<ScheduleTemplate['recurrenceType'], (template: ScheduleTemplate) => string> = {
+  every_n_days: (template) => `Every ${template.intervalDays} day(s) at ${template.startTime}`,
+  weekly: (template) => `Every ${template.intervalWeeks} week(s) at ${template.startTime}`,
+  monthly: (template) =>
+    `Every ${template.intervalMonths} month(s) on day ${template.dayOfMonth} at ${template.startTime}`,
 };
 
 export function SchedulesPage() {
@@ -18,23 +18,22 @@ export function SchedulesPage() {
   const household = state.status === 'authenticated' ? state.households[0] : undefined;
   const householdId = household?.id;
 
-  const [patterns, setPatterns] = useState<SchedulePattern[] | null>(null);
+  const [templates, setTemplates] = useState<ScheduleTemplate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [renamingId, setRenamingId] = useState<number | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!householdId) return;
     let cancelled = false;
-    patternApi
-      .listPatterns(householdId)
+    scheduleTemplateApi
+      .listScheduleTemplates(householdId)
       .then((result) => {
-        if (!cancelled) setPatterns(result);
+        if (!cancelled) setTemplates(result);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Could not load schedule patterns.');
+          setError(err instanceof ApiError ? err.message : 'Could not load schedules.');
         }
       });
     return () => {
@@ -42,46 +41,15 @@ export function SchedulesPage() {
     };
   }, [householdId]);
 
-  async function handleCreate(input: CreatePatternInput) {
+  async function handleRemove(scheduleTemplateId: number) {
     if (!householdId) return;
     setBusy(true);
     setError(null);
     try {
-      const created = await patternApi.createPattern(householdId, input);
-      setPatterns((prev) => [...(prev ?? []), created]);
+      await scheduleTemplateApi.removeScheduleTemplate(householdId, scheduleTemplateId);
+      setTemplates((prev) => prev?.filter((template) => template.id !== scheduleTemplateId) ?? prev);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save that pattern.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRename(patternId: number) {
-    if (!householdId) return;
-    const trimmed = renameValue.trim();
-    if (!trimmed) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await patternApi.renamePattern(householdId, patternId, { name: trimmed });
-      setPatterns((prev) => prev?.map((pattern) => (pattern.id === patternId ? updated : pattern)) ?? prev);
-      setRenamingId(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not rename that pattern.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRemove(patternId: number) {
-    if (!householdId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await patternApi.removePattern(householdId, patternId);
-      setPatterns((prev) => prev?.filter((pattern) => pattern.id !== patternId) ?? prev);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not remove that pattern.');
+      setError(err instanceof ApiError ? err.message : 'Could not remove that schedule.');
     } finally {
       setBusy(false);
     }
@@ -94,72 +62,77 @@ export function SchedulesPage() {
   const isHead = household.role === 'head';
 
   return (
-    <div className="card">
-      <h1>Schedules</h1>
+    <>
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1>Schedules</h1>
+        </div>
+        {isHead && (
+          <Link to="/schedules/new" className="btn-fab" aria-label="Add schedule">
+            +
+          </Link>
+        )}
+      </div>
       <p className="card-eyebrow">For {household.name}</p>
       <ErrorBanner message={error} />
-      {patterns ? (
-        <ul className="pattern-list">
-          {patterns.map((pattern) => (
-            <li className="pattern-list-item" key={pattern.id}>
-              {renamingId === pattern.id ? (
-                <span className="pattern-rename-form">
-                  <input
-                    type="text"
-                    value={renameValue}
-                    onChange={(event) => setRenameValue(event.target.value)}
-                    autoFocus
-                  />
+      {templates ? (
+        templates.length > 0 ? (
+          <ul className="chores-list">
+            {templates.map((template) => (
+              <li className="chore-card" key={template.id}>
+                {isHead && confirmingRemoveId !== template.id && (
                   <button
                     type="button"
-                    className="btn btn-text"
-                    disabled={busy}
-                    onClick={() => void handleRename(pattern.id)}
+                    className="chore-remove-btn"
+                    onClick={() => setConfirmingRemoveId(template.id)}
+                    aria-label={`Remove ${template.name}`}
                   >
-                    Save
+                    ×
                   </button>
-                  <button type="button" className="btn btn-text" onClick={() => setRenamingId(null)}>
-                    Cancel
-                  </button>
-                </span>
-              ) : (
-                <>
-                  <span className="pattern-name">{pattern.name}</span>
-                  <span className="pattern-summary">{RECURRENCE_LABEL[pattern.recurrenceType](pattern)}</span>
-                  {isHead && (
-                    <span className="pattern-actions">
-                      <button
-                        type="button"
-                        className="btn btn-text"
-                        onClick={() => {
-                          setRenamingId(pattern.id);
-                          setRenameValue(pattern.name);
-                        }}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-text"
-                        disabled={busy}
-                        onClick={() => void handleRemove(pattern.id)}
-                      >
-                        Remove
-                      </button>
-                    </span>
-                  )}
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
+                )}
+                <div className="chore-row-main">
+                  <span className="chore-name">{template.name}</span>
+                </div>
+                {confirmingRemoveId === template.id && (
+                  <div className="zone-inline-form">
+                    <span>Remove this schedule?</span>
+                    <button
+                      type="button"
+                      className="btn btn-pill-outline"
+                      disabled={busy}
+                      onClick={() => {
+                        void handleRemove(template.id);
+                        setConfirmingRemoveId(null);
+                      }}
+                    >
+                      {busy ? 'Removing…' : 'Yes, remove'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-text"
+                      onClick={() => setConfirmingRemoveId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <div className="chore-schedule-control">
+                  <span className="chore-schedule-summary">
+                    {RECURRENCE_LABEL[template.recurrenceType](template)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="chores-empty">No schedules yet.</p>
+        )
       ) : (
-        !error && <p className="members-loading">Loading patterns…</p>
+        !error && <p className="members-loading">Loading schedules…</p>
       )}
-      {isHead && <PatternForm submitting={busy} onSubmit={(input) => void handleCreate(input)} />}
       <p className="card-footer">
         <Link to="/">Back</Link>
       </p>
-    </div>
+    </>
   );
 }

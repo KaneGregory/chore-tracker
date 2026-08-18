@@ -5,7 +5,7 @@ import { authRouter } from './routes/auth.js';
 import { householdsRouter } from './routes/households.js';
 import { zonesRouter } from './routes/zones.js';
 import { choresRouter } from './routes/chores.js';
-import { patternsRouter } from './routes/patterns.js';
+import { scheduleTemplatesRouter } from './routes/scheduleTemplates.js';
 import { pushRouter } from './routes/push.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -33,7 +33,7 @@ export function createApp() {
   app.use('/api/households', householdsRouter);
   app.use('/api/households', zonesRouter);
   app.use('/api/households', choresRouter);
-  app.use('/api/households', patternsRouter);
+  app.use('/api/households', scheduleTemplatesRouter);
   app.use('/api/push', pushRouter);
 
   app.use(errorHandler);

@@ -180,27 +180,30 @@ export const choreSchedules = sqliteTable(
   ],
 );
 
-export const PATTERN_RECURRENCE_TYPES = ['every_n_days', 'weekly', 'monthly'] as const;
-export type PatternRecurrenceType = (typeof PATTERN_RECURRENCE_TYPES)[number];
+export const SCHEDULE_TEMPLATE_RECURRENCE_TYPES = ['every_n_days', 'weekly', 'monthly'] as const;
+export type ScheduleTemplateRecurrenceType = (typeof SCHEDULE_TEMPLATE_RECURRENCE_TYPES)[number];
 
 // Household-scoped, reusable recurrence shapes a head can apply to a chore/zone's
-// schedule via a picker (see patternService.ts) — snapshot semantics: applying one
-// just pre-fills the schedule form. There is no FK from chore_schedules back here,
-// so editing/deleting a pattern never touches a schedule that already used it.
-// Deliberately excludes 'once' from its own recurrence-type enum (rather than
-// reusing RECURRENCE_TYPES) — a one-off date isn't reusable as a named pattern.
-// No startAt/target/nextRunAt like chore_schedules — a pattern is never itself
-// evaluated by choreScheduler.ts, so startTime is plain 'HH:MM' text rather than an
-// epoch instant, and monthly's dayOfMonth is a first-class input here (unlike
-// chore_schedules, which derives it from startDate — a pattern has no date to derive
-// it from).
-export const schedulePatterns = sqliteTable('schedule_patterns', {
+// schedule via a picker (see scheduleTemplateService.ts) — snapshot semantics:
+// applying one just pre-fills the schedule form. There is no FK from chore_schedules
+// back here, so editing/deleting a schedule template never touches a schedule that
+// already used it. Deliberately excludes 'once' from its own recurrence-type enum
+// (rather than reusing RECURRENCE_TYPES) — a one-off date isn't reusable as a named
+// template. No startAt/target/nextRunAt like chore_schedules — a schedule template is
+// never itself evaluated by choreScheduler.ts, so startTime is plain 'HH:MM' text
+// rather than an epoch instant, and monthly's dayOfMonth is a first-class input here
+// (unlike chore_schedules, which derives it from startDate — a schedule template has
+// no date to derive it from). The underlying table name (`schedule_patterns`,
+// migration `0014`) predates this identifier's rename and was left as-is — renaming a
+// SQL table needs its own migration, and the exported binding name here is all that
+// actually needs to track the concept's current name.
+export const scheduleTemplates = sqliteTable('schedule_patterns', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   householdId: integer('household_id')
     .notNull()
     .references(() => households.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  recurrenceType: text('recurrence_type', { enum: PATTERN_RECURRENCE_TYPES }).notNull(),
+  recurrenceType: text('recurrence_type', { enum: SCHEDULE_TEMPLATE_RECURRENCE_TYPES }).notNull(),
   startTime: text('start_time').notNull(),
   intervalDays: integer('interval_days'),
   intervalWeeks: integer('interval_weeks'),

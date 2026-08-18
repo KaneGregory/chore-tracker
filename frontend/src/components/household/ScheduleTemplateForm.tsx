@@ -1,17 +1,17 @@
 import { useState, type FormEvent } from 'react';
-import type { CreatePatternInput, PatternRecurrenceType } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplateRecurrenceType } from '../../types/scheduleTemplate';
 import { FormField } from '../common/FormField';
 
-interface PatternFormProps {
+interface ScheduleTemplateFormProps {
   submitting: boolean;
-  onSubmit: (input: CreatePatternInput) => void;
+  onSubmit: (input: CreateScheduleTemplateInput) => void;
 }
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function PatternForm({ submitting, onSubmit }: PatternFormProps) {
+export function ScheduleTemplateForm({ submitting, onSubmit }: ScheduleTemplateFormProps) {
   const [name, setName] = useState('');
-  const [recurrenceType, setRecurrenceType] = useState<PatternRecurrenceType>('every_n_days');
+  const [recurrenceType, setRecurrenceType] = useState<ScheduleTemplateRecurrenceType>('every_n_days');
   const [startTime, setStartTime] = useState('09:00');
   const [intervalDays, setIntervalDays] = useState(1);
   const [intervalWeeks, setIntervalWeeks] = useState(1);
@@ -53,14 +53,14 @@ export function PatternForm({ submitting, onSubmit }: PatternFormProps) {
   }
 
   return (
-    <form className="chore-schedule-form" onSubmit={handleSubmit}>
-      <FormField label="Pattern name" name="patternName" value={name} onChange={setName} required />
+    <form className="create-chore-form" onSubmit={handleSubmit}>
+      <FormField label="Schedule name" name="scheduleTemplateName" value={name} onChange={setName} required />
 
       <label className="schedule-field">
         Repeats
         <select
           value={recurrenceType}
-          onChange={(event) => setRecurrenceType(event.target.value as PatternRecurrenceType)}
+          onChange={(event) => setRecurrenceType(event.target.value as ScheduleTemplateRecurrenceType)}
         >
           <option value="every_n_days">Every few days</option>
           <option value="weekly">Weekly</option>
@@ -132,10 +132,10 @@ export function PatternForm({ submitting, onSubmit }: PatternFormProps) {
         </>
       )}
 
-      <FormField label="At" name="patternStartTime" type="time" value={startTime} onChange={setStartTime} required />
+      <FormField label="At" name="scheduleTemplateStartTime" type="time" value={startTime} onChange={setStartTime} required />
 
-      <button type="submit" className="btn btn-pill-outline" disabled={submitting}>
-        {submitting ? 'Saving…' : 'Save pattern'}
+      <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+        {submitting ? 'Saving…' : 'Save schedule'}
       </button>
     </form>
   );

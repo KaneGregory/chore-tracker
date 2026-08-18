@@ -1,15 +1,15 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { schedulePatterns } from '../db/schema.js';
-import type { PatternRecurrenceType } from '../db/schema.js';
-import { PatternNotFoundError } from '../errors.js';
+import { scheduleTemplates } from '../db/schema.js';
+import type { ScheduleTemplateRecurrenceType } from '../db/schema.js';
+import { ScheduleTemplateNotFoundError } from '../errors.js';
 import { requireHeadMembership, requireMembership } from './membershipAuth.js';
-import type { CreatePatternInput, RenamePatternInput } from '../validation/patternSchemas.js';
+import type { CreateScheduleTemplateInput } from '../validation/scheduleTemplateSchemas.js';
 
-export interface SchedulePattern {
+export interface ScheduleTemplate {
   id: number;
   name: string;
-  recurrenceType: PatternRecurrenceType;
+  recurrenceType: ScheduleTemplateRecurrenceType;
   startTime: string;
   intervalDays: number | null;
   intervalWeeks: number | null;
@@ -18,9 +18,9 @@ export interface SchedulePattern {
   dayOfMonth: number | null;
 }
 
-type PatternRow = typeof schedulePatterns.$inferSelect;
+type ScheduleTemplateRow = typeof scheduleTemplates.$inferSelect;
 
-function toSummary(row: PatternRow): SchedulePattern {
+function toSummary(row: ScheduleTemplateRow): ScheduleTemplate {
   return {
     id: row.id,
     name: row.name,
@@ -36,7 +36,7 @@ function toSummary(row: PatternRow): SchedulePattern {
 
 // Mirrors scheduleService.ts's buildRowValues — one recurrence-shaped column set per
 // type, everything else null.
-function buildRowValues(input: CreatePatternInput) {
+function buildRowValues(input: CreateScheduleTemplateInput) {
   switch (input.recurrenceType) {
     case 'every_n_days':
       return {
@@ -68,37 +68,40 @@ function buildRowValues(input: CreatePatternInput) {
   }
 }
 
-function findPatternInHousehold(householdId: number, patternId: number): PatternRow | undefined {
+function findScheduleTemplateInHousehold(
+  householdId: number,
+  scheduleTemplateId: number,
+): ScheduleTemplateRow | undefined {
   return db
     .select()
-    .from(schedulePatterns)
-    .where(and(eq(schedulePatterns.id, patternId), eq(schedulePatterns.householdId, householdId)))
+    .from(scheduleTemplates)
+    .where(and(eq(scheduleTemplates.id, scheduleTemplateId), eq(scheduleTemplates.householdId, householdId)))
     .get();
 }
 
-export function listPatternsForHousehold(
+export function listScheduleTemplatesForHousehold(
   householdId: number,
   requestingUserId: number,
-): SchedulePattern[] {
+): ScheduleTemplate[] {
   requireMembership(householdId, requestingUserId);
   return db
     .select()
-    .from(schedulePatterns)
-    .where(eq(schedulePatterns.householdId, householdId))
+    .from(scheduleTemplates)
+    .where(eq(scheduleTemplates.householdId, householdId))
     .all()
     .map(toSummary);
 }
 
-export function createPattern(
+export function createScheduleTemplate(
   householdId: number,
   requestingUserId: number,
-  input: CreatePatternInput,
-): SchedulePattern {
+  input: CreateScheduleTemplateInput,
+): ScheduleTemplate {
   requireHeadMembership(householdId, requestingUserId);
 
   const values = buildRowValues(input);
   const row = db
-    .insert(schedulePatterns)
+    .insert(scheduleTemplates)
     .values({
       householdId,
       name: input.name,
@@ -112,34 +115,16 @@ export function createPattern(
   return toSummary(row);
 }
 
-export function renamePattern(
+export function removeScheduleTemplate(
   householdId: number,
   requestingUserId: number,
-  patternId: number,
-  input: RenamePatternInput,
-): SchedulePattern {
-  requireHeadMembership(householdId, requestingUserId);
-
-  if (!findPatternInHousehold(householdId, patternId)) throw new PatternNotFoundError();
-
-  const row = db
-    .update(schedulePatterns)
-    .set({ name: input.name })
-    .where(eq(schedulePatterns.id, patternId))
-    .returning()
-    .get();
-
-  return toSummary(row);
-}
-
-export function removePattern(
-  householdId: number,
-  requestingUserId: number,
-  patternId: number,
+  scheduleTemplateId: number,
 ): void {
   requireHeadMembership(householdId, requestingUserId);
 
-  if (!findPatternInHousehold(householdId, patternId)) throw new PatternNotFoundError();
+  if (!findScheduleTemplateInHousehold(householdId, scheduleTemplateId)) {
+    throw new ScheduleTemplateNotFoundError();
+  }
 
-  db.delete(schedulePatterns).where(eq(schedulePatterns.id, patternId)).run();
+  db.delete(scheduleTemplates).where(eq(scheduleTemplates.id, scheduleTemplateId)).run();
 }

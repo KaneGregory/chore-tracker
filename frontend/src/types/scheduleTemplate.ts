@@ -1,9 +1,9 @@
-export type PatternRecurrenceType = 'every_n_days' | 'weekly' | 'monthly';
+export type ScheduleTemplateRecurrenceType = 'every_n_days' | 'weekly' | 'monthly';
 
-export interface SchedulePattern {
+export interface ScheduleTemplate {
   id: number;
   name: string;
-  recurrenceType: PatternRecurrenceType;
+  recurrenceType: ScheduleTemplateRecurrenceType;
   startTime: string; // HH:MM
   intervalDays: number | null;
   intervalWeeks: number | null;
@@ -12,7 +12,7 @@ export interface SchedulePattern {
   dayOfMonth: number | null;
 }
 
-export type CreatePatternInput =
+export type CreateScheduleTemplateInput =
   | { recurrenceType: 'every_n_days'; name: string; startTime: string; intervalDays: number }
   | {
       recurrenceType: 'weekly';
@@ -28,7 +28,3 @@ export type CreatePatternInput =
       intervalMonths: number;
       dayOfMonth: number;
     };
-
-export interface RenamePatternInput {
-  name: string;
-}

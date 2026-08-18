@@ -6,7 +6,7 @@ import * as zoneApi from '../../api/zoneApi';
 import * as choreApi from '../../api/choreApi';
 import * as householdApi from '../../api/householdApi';
 import * as scheduleApi from '../../api/scheduleApi';
-import * as patternApi from '../../api/patternApi';
+import * as scheduleTemplateApi from '../../api/scheduleTemplateApi';
 import { ApiError } from '../../api/httpClient';
 import { flattenZones } from '../../utils/zoneTree';
 import { filterChores } from '../../utils/choreFilter';
@@ -15,7 +15,7 @@ import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
 import type { Chore, ChoreFilter, SettableChoreStatus } from '../../types/chore';
 import type { Schedule, ScheduleInput, ScheduleWithTarget } from '../../types/schedule';
-import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 
 export function HouseholdCard({
   household,
@@ -37,7 +37,7 @@ export function HouseholdCard({
   const [assignError, setAssignError] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<ScheduleWithTarget[]>([]);
   const [scheduleSubmittingKey, setScheduleSubmittingKey] = useState<string | null>(null);
-  const [patterns, setPatterns] = useState<SchedulePattern[]>([]);
+  const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>([]);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
@@ -111,14 +111,15 @@ export function HouseholdCard({
 
   useEffect(() => {
     let cancelled = false;
-    patternApi
-      .listPatterns(household.id)
+    scheduleTemplateApi
+      .listScheduleTemplates(household.id)
       .then((result) => {
-        if (!cancelled) setPatterns(result);
+        if (!cancelled) setScheduleTemplates(result);
       })
       .catch(() => {
-        // Same rationale as members/schedules above: patterns are a convenience for
-        // setting up a schedule faster, not required to view or manage chores.
+        // Same rationale as members/schedules above: schedule templates are a
+        // convenience for setting up a schedule faster, not required to view or
+        // manage chores.
       });
     return () => {
       cancelled = true;
@@ -234,12 +235,12 @@ export function HouseholdCard({
     }
   }
 
-  async function handleSaveAsPattern(input: CreatePatternInput) {
+  async function handleSaveAsScheduleTemplate(input: CreateScheduleTemplateInput) {
     try {
-      const created = await patternApi.createPattern(household.id, input);
-      setPatterns((prev) => [...prev, created]);
+      const created = await scheduleTemplateApi.createScheduleTemplate(household.id, input);
+      setScheduleTemplates((prev) => [...prev, created]);
     } catch (err) {
-      setAssignError(err instanceof ApiError ? err.message : 'Could not save that pattern.');
+      setAssignError(err instanceof ApiError ? err.message : 'Could not save that schedule template.');
     }
   }
 
@@ -327,14 +328,14 @@ export function HouseholdCard({
             selectMode={selectMode}
             onToggleSelectMode={toggleSelectMode}
             selectedCount={selectedTargets.size}
-            patterns={patterns}
+            scheduleTemplates={scheduleTemplates}
             submitting={bulkSubmitting}
             resultMessage={bulkResultMessage}
             // Deliberately not void-wrapped, unlike every other async handler here:
             // BulkScheduleBar awaits this promise to keep its inline form mounted
             // until the batch actually resolves (see BulkScheduleBar.tsx).
             onApply={(input) => handleBulkApplySchedule(input)}
-            onSaveAsPattern={(input) => void handleSaveAsPattern(input)}
+            onSaveAsScheduleTemplate={(input) => void handleSaveAsScheduleTemplate(input)}
           />
           <ChoresList
             chores={filterChores(chores, filter, state.user.id)}
@@ -357,8 +358,8 @@ export function HouseholdCard({
             scheduleSubmittingKey={scheduleSubmittingKey}
             onSetSchedule={(choreId, zoneId, input) => void handleSetSchedule(choreId, zoneId, input)}
             onRemoveSchedule={(choreId, zoneId) => void handleRemoveSchedule(choreId, zoneId)}
-            patterns={patterns}
-            onSaveAsPattern={(input) => void handleSaveAsPattern(input)}
+            scheduleTemplates={scheduleTemplates}
+            onSaveAsScheduleTemplate={(input) => void handleSaveAsScheduleTemplate(input)}
             selectMode={selectMode}
             selectedTargets={selectedTargets}
             onToggleTarget={handleToggleTarget}

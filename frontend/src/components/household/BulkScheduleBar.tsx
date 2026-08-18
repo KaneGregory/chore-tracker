@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CreatePatternInput, SchedulePattern } from '../../types/pattern';
+import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import type { ScheduleInput } from '../../types/schedule';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
@@ -8,7 +8,7 @@ interface BulkScheduleBarProps {
   selectMode: boolean;
   onToggleSelectMode: () => void;
   selectedCount: number;
-  patterns: SchedulePattern[];
+  scheduleTemplates: ScheduleTemplate[];
   submitting: boolean;
   resultMessage: string | null;
   // Returns a Promise, awaited below, rather than firing-and-forgetting: the
@@ -19,7 +19,7 @@ interface BulkScheduleBarProps {
   // was still in flight, letting a user fire a second overlapping batch against the
   // same targets.
   onApply: (input: ScheduleInput) => Promise<void>;
-  onSaveAsPattern: (input: CreatePatternInput) => void;
+  onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
 }
 
 export function BulkScheduleBar({
@@ -27,11 +27,11 @@ export function BulkScheduleBar({
   selectMode,
   onToggleSelectMode,
   selectedCount,
-  patterns,
+  scheduleTemplates,
   submitting,
   resultMessage,
   onApply,
-  onSaveAsPattern,
+  onSaveAsScheduleTemplate,
 }: BulkScheduleBarProps) {
   const [applying, setApplying] = useState(false);
 
@@ -59,10 +59,10 @@ export function BulkScheduleBar({
       {applying && (
         <ChoreScheduleForm
           schedule={null}
-          patterns={patterns}
+          scheduleTemplates={scheduleTemplates}
           submitting={submitting}
           onSave={(input) => void handleApply(input)}
-          onSaveAsPattern={onSaveAsPattern}
+          onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
           onCancel={() => setApplying(false)}
         />
       )}

@@ -1,4 +1,4 @@
-import type { SchedulePattern } from '../types/pattern';
+import type { ScheduleTemplate } from '../types/scheduleTemplate';
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
@@ -18,36 +18,36 @@ function daysInMonth(year: number, month: number): number {
 // browser's own local calendar, not a server round-trip; this feature already
 // accepts that browser-vs-household timezone can drift slightly (see
 // HouseholdCard.tsx's timezone-sync comment), which is fine for a pre-fill.
-export function suggestStartDate(pattern: SchedulePattern, today: Date = new Date()): string {
-  switch (pattern.recurrenceType) {
+export function suggestStartDate(template: ScheduleTemplate, today: Date = new Date()): string {
+  switch (template.recurrenceType) {
     case 'every_n_days':
       return formatDate(today);
 
     case 'weekly': {
-      const weekdays = new Set(pattern.weekdays ?? []);
+      const weekdays = new Set(template.weekdays ?? []);
       for (let offset = 0; offset < 7; offset++) {
         const candidate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
         if (weekdays.has(candidate.getDay())) return formatDate(candidate);
       }
-      // Unreachable if the pattern has at least one weekday (always true once
-      // created — see patternSchemas.ts's min(1) on weekdays), kept as a safe
-      // fallback rather than throwing.
+      // Unreachable if the template has at least one weekday (always true once
+      // created — see scheduleTemplateSchemas.ts's min(1) on weekdays), kept as a
+      // safe fallback rather than throwing.
       return formatDate(today);
     }
 
     case 'monthly': {
-      const day = pattern.dayOfMonth ?? 1;
+      const day = template.dayOfMonth ?? 1;
       const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
       // Deliberately does NOT clamp to a short month's last day the way
       // scheduleTime.ts's real monthly stepping does — clamping here would suggest
-      // e.g. Feb 28 for a "31st of every month" pattern, and since the eventual
+      // e.g. Feb 28 for a "31st of every month" template, and since the eventual
       // schedule's own dayOfMonth is derived from whatever date actually gets saved
-      // (see ChoreScheduleForm.tsx's buildPatternInput / scheduleService.ts), a
-      // clamped suggestion the user doesn't think to correct would permanently
+      // (see ChoreScheduleForm.tsx's buildScheduleTemplateInput / scheduleService.ts),
+      // a clamped suggestion the user doesn't think to correct would permanently
       // downgrade the schedule to the 28th instead of the 31st. Searching forward to
       // the next month that actually has this day keeps the suggested date's
-      // day-of-month exactly equal to the pattern's, always.
+      // day-of-month exactly equal to the template's, always.
       for (let monthOffset = 0; monthOffset < 12; monthOffset++) {
         const monthIndex = today.getMonth() + monthOffset;
         const year = today.getFullYear() + Math.floor(monthIndex / 12);
@@ -56,9 +56,9 @@ export function suggestStartDate(pattern: SchedulePattern, today: Date = new Dat
         const candidate = new Date(year, zeroBasedMonth, day);
         if (candidate >= todayOnly) return formatDate(candidate);
       }
-      // Unreachable for a valid dayOfMonth (1-31, enforced by patternSchemas.ts) —
-      // within any 12 consecutive months there's always at least one match. Kept as
-      // a safe fallback rather than throwing.
+      // Unreachable for a valid dayOfMonth (1-31, enforced by
+      // scheduleTemplateSchemas.ts) — within any 12 consecutive months there's always
+      // at least one match. Kept as a safe fallback rather than throwing.
       return formatDate(todayOnly);
     }
   }
