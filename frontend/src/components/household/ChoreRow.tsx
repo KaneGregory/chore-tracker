@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Chore, ChoreStatus, SettableChoreStatus } from '../../types/chore';
 import type { HouseholdMember } from '../../types/auth';
 import { AssignmentChips } from './AssignmentChips';
@@ -31,9 +31,9 @@ interface ChoreRowProps {
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
   scheduleTemplates: ScheduleTemplate[];
   onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
-  selectMode: boolean;
   selectedTargets: Set<string>;
   onToggleTarget: (choreId: number, zoneId: number | null) => void;
+  onSetZoneGroupSelected: (choreId: number, zoneIds: number[], selected: boolean) => void;
 }
 
 export function ChoreRow({
@@ -58,9 +58,9 @@ export function ChoreRow({
   onRemoveSchedule,
   scheduleTemplates,
   onSaveAsScheduleTemplate,
-  selectMode,
   selectedTargets,
   onToggleTarget,
+  onSetZoneGroupSelected,
 }: ChoreRowProps) {
   const hasZones = chore.zones.length > 0;
   const visibleZones = visibleZoneIds
@@ -70,6 +70,20 @@ export function ChoreRow({
   const isRemoving = removingChoreId === chore.id;
   const isUpdatingStatus = statusUpdatingKey === `${chore.id}:none`;
   const scheduleKey = `${chore.id}:none`;
+
+  const visibleZoneIdList = visibleZones.map((zone) => zone.zoneId);
+  const selectedZoneCount = visibleZoneIdList.filter((zoneId) =>
+    selectedTargets.has(`${chore.id}:${zoneId}`),
+  ).length;
+  const allZonesSelected = visibleZoneIdList.length > 0 && selectedZoneCount === visibleZoneIdList.length;
+  const someZonesSelected = selectedZoneCount > 0 && !allZonesSelected;
+
+  const groupCheckboxRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (groupCheckboxRef.current) {
+      groupCheckboxRef.current.indeterminate = someZonesSelected;
+    }
+  }, [someZonesSelected]);
 
   function assignmentsFor(zoneId: number | null) {
     return chore.assignments.filter((assignment) => assignment.zoneId === zoneId);
@@ -87,11 +101,34 @@ export function ChoreRow({
           ×
         </button>
       )}
-      <div className="chore-row-main">
-        <span className="chore-name">{chore.name}</span>
-        <span className={`chore-status-badge chore-status-${displayStatus}`}>
-          {CHORE_STATUS_LABEL[displayStatus]}
-        </span>
+      <div className="chore-row-header">
+        {isHead && !hasZones && (
+          <label className="chore-select-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedTargets.has(scheduleKey)}
+              onChange={() => onToggleTarget(chore.id, null)}
+              aria-label={`Select ${chore.name}`}
+            />
+          </label>
+        )}
+        {isHead && hasZones && (
+          <label className="chore-select-checkbox">
+            <input
+              type="checkbox"
+              ref={groupCheckboxRef}
+              checked={allZonesSelected}
+              onChange={() => onSetZoneGroupSelected(chore.id, visibleZoneIdList, !allZonesSelected)}
+              aria-label={`Select all zones for ${chore.name}`}
+            />
+          </label>
+        )}
+        <div className="chore-row-main">
+          <span className="chore-name">{chore.name}</span>
+          <span className={`chore-status-badge chore-status-${displayStatus}`}>
+            {CHORE_STATUS_LABEL[displayStatus]}
+          </span>
+        </div>
       </div>
       {confirmingRemove && (
         <div className="zone-inline-form">
@@ -128,16 +165,6 @@ export function ChoreRow({
       </div>
       {!hasZones && (
         <div className="chore-schedule-row">
-          {selectMode && (
-            <label className="chore-select-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedTargets.has(scheduleKey)}
-                onChange={() => onToggleTarget(chore.id, null)}
-                aria-label={`Select ${chore.name}`}
-              />
-            </label>
-          )}
           <ChoreScheduleControl
             schedule={scheduleByTarget.get(scheduleKey) ?? null}
             scheduleTemplates={scheduleTemplates}
@@ -182,7 +209,6 @@ export function ChoreRow({
               onRemoveSchedule={onRemoveSchedule}
               scheduleTemplates={scheduleTemplates}
               onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
-              selectMode={selectMode}
               selectedTargets={selectedTargets}
               onToggleTarget={onToggleTarget}
             />

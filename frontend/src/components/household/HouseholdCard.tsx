@@ -38,7 +38,6 @@ export function HouseholdCard({
   const [schedules, setSchedules] = useState<ScheduleWithTarget[]>([]);
   const [scheduleSubmittingKey, setScheduleSubmittingKey] = useState<string | null>(null);
   const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>([]);
-  const [selectMode, setSelectMode] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkResultMessage, setBulkResultMessage] = useState<string | null>(null);
@@ -244,12 +243,6 @@ export function HouseholdCard({
     }
   }
 
-  function toggleSelectMode() {
-    setSelectMode((prev) => !prev);
-    setSelectedTargets(new Set());
-    setBulkResultMessage(null);
-  }
-
   function handleToggleTarget(choreId: number, zoneId: number | null) {
     const key = `${choreId}:${zoneId ?? 'none'}`;
     setSelectedTargets((prev) => {
@@ -261,6 +254,27 @@ export function HouseholdCard({
       }
       return next;
     });
+    setBulkResultMessage(null);
+  }
+
+  // Backs a zoned chore's tri-state header checkbox: unlike handleToggleTarget
+  // (which flips one target), this sets every one of the chore's zones to the same
+  // selected state in one go, so "select all"/"deselect all" doesn't depend on each
+  // zone's prior individual state.
+  function handleSetZoneGroupSelected(choreId: number, zoneIds: number[], selected: boolean) {
+    setSelectedTargets((prev) => {
+      const next = new Set(prev);
+      for (const zoneId of zoneIds) {
+        const key = `${choreId}:${zoneId}`;
+        if (selected) {
+          next.add(key);
+        } else {
+          next.delete(key);
+        }
+      }
+      return next;
+    });
+    setBulkResultMessage(null);
   }
 
   async function handleBulkApplySchedule(input: ScheduleInput) {
@@ -308,7 +322,6 @@ export function HouseholdCard({
         : `Applied to ${succeeded} of ${results.length} — ${failed} failed.`,
     );
     setBulkSubmitting(false);
-    setSelectMode(false);
     setSelectedTargets(new Set());
   }
 
@@ -325,8 +338,6 @@ export function HouseholdCard({
         <>
           <BulkScheduleBar
             isHead={isHead}
-            selectMode={selectMode}
-            onToggleSelectMode={toggleSelectMode}
             selectedCount={selectedTargets.size}
             scheduleTemplates={scheduleTemplates}
             submitting={bulkSubmitting}
@@ -360,9 +371,9 @@ export function HouseholdCard({
             onRemoveSchedule={(choreId, zoneId) => void handleRemoveSchedule(choreId, zoneId)}
             scheduleTemplates={scheduleTemplates}
             onSaveAsScheduleTemplate={(input) => void handleSaveAsScheduleTemplate(input)}
-            selectMode={selectMode}
             selectedTargets={selectedTargets}
             onToggleTarget={handleToggleTarget}
+            onSetZoneGroupSelected={handleSetZoneGroupSelected}
           />
         </>
       ) : (

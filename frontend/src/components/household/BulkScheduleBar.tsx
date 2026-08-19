@@ -1,12 +1,10 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import type { ScheduleInput } from '../../types/schedule';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
 interface BulkScheduleBarProps {
   isHead: boolean;
-  selectMode: boolean;
-  onToggleSelectMode: () => void;
   selectedCount: number;
   scheduleTemplates: ScheduleTemplate[];
   submitting: boolean;
@@ -24,8 +22,6 @@ interface BulkScheduleBarProps {
 
 export function BulkScheduleBar({
   isHead,
-  selectMode,
-  onToggleSelectMode,
   selectedCount,
   scheduleTemplates,
   submitting,
@@ -34,20 +30,45 @@ export function BulkScheduleBar({
   onSaveAsScheduleTemplate,
 }: BulkScheduleBarProps) {
   const [applying, setApplying] = useState(false);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const visible = isHead && (selectedCount > 0 || resultMessage !== null);
+
+  // The bar is `position: fixed` (see .bulk-schedule-bar in index.css), so it never
+  // takes up space in the page's own layout — without this, it would sit on top of
+  // whatever content happens to be scrolled to the bottom of the page rather than
+  // pushing it into view. Mirroring its live height into a CSS variable lets #root
+  // reserve exactly that much extra bottom padding, so the page's own scroll range
+  // always has room for it. Depends only on `visible`, not on `applying`/
+  // `selectedCount`/etc: the ResizeObserver below already reacts to size changes on
+  // the same element (e.g. the form expanding), so re-running the effect for those
+  // would just attach a second, redundant observer.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const el = barRef.current;
+    if (!visible || !el) {
+      root.style.setProperty('--bulk-bar-height', '0px');
+      return;
+    }
+    const updateHeight = () => root.style.setProperty('--bulk-bar-height', `${el.offsetHeight}px`);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.setProperty('--bulk-bar-height', '0px');
+    };
+  }, [visible]);
 
   async function handleApply(input: ScheduleInput) {
     await onApply(input);
     setApplying(false);
   }
 
-  if (!isHead) return null;
+  if (!visible) return null;
 
   return (
-    <div className="bulk-schedule-bar">
-      <button type="button" className="btn btn-pill-outline" onClick={onToggleSelectMode}>
-        {selectMode ? 'Cancel' : 'Select chores'}
-      </button>
-      {selectMode && selectedCount > 0 && !applying && (
+    <div className="bulk-schedule-bar" ref={barRef}>
+      {selectedCount > 0 && !applying && (
         <>
           <span className="bulk-schedule-count">{selectedCount} selected</span>
           <button type="button" className="btn btn-pill-outline" onClick={() => setApplying(true)}>

@@ -26,9 +26,9 @@ interface ChoresListProps {
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
   scheduleTemplates: ScheduleTemplate[];
   onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
-  selectMode: boolean;
   selectedTargets: Set<string>;
   onToggleTarget: (choreId: number, zoneId: number | null) => void;
+  onSetZoneGroupSelected: (choreId: number, zoneIds: number[], selected: boolean) => void;
 }
 
 export function ChoresList({
@@ -52,9 +52,9 @@ export function ChoresList({
   onRemoveSchedule,
   scheduleTemplates,
   onSaveAsScheduleTemplate,
-  selectMode,
   selectedTargets,
   onToggleTarget,
+  onSetZoneGroupSelected,
 }: ChoresListProps) {
   if (chores.length === 0) {
     return (
@@ -90,9 +90,9 @@ export function ChoresList({
           onRemoveSchedule={onRemoveSchedule}
           scheduleTemplates={scheduleTemplates}
           onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
-          selectMode={selectMode}
           selectedTargets={selectedTargets}
           onToggleTarget={onToggleTarget}
+          onSetZoneGroupSelected={onSetZoneGroupSelected}
         />
       ))}
     </ul>

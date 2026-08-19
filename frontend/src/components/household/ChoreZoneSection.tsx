@@ -28,7 +28,6 @@ interface ChoreZoneSectionProps {
   onRemoveSchedule: (choreId: number, zoneId: number | null) => void;
   scheduleTemplates: ScheduleTemplate[];
   onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
-  selectMode: boolean;
   selectedTargets: Set<string>;
   onToggleTarget: (choreId: number, zoneId: number | null) => void;
 }
@@ -53,7 +52,6 @@ export function ChoreZoneSection({
   onRemoveSchedule,
   scheduleTemplates,
   onSaveAsScheduleTemplate,
-  selectMode,
   selectedTargets,
   onToggleTarget,
 }: ChoreZoneSectionProps) {
@@ -64,7 +62,7 @@ export function ChoreZoneSection({
   return (
     <li className={`chore-zone-section status-${zone.status}`}>
       <div className="chore-zone-row">
-        {selectMode && (
+        {isHead && (
           <label className="chore-select-checkbox">
             <input
               type="checkbox"
