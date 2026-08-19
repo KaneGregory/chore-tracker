@@ -48,6 +48,9 @@ export function AssignmentChips({
 
   return (
     <span className="assignment-chips">
+      {assignments.length === 0 && !readOnly && (
+        <span className="assignment-chips-empty">No assigned members</span>
+      )}
       {assignments.map((assignment) => {
         const canRemove = !readOnly && (isHead || assignment.userId === currentUserId);
         const removing = unassigningId === assignment.id;

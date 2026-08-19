@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPenToSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarPlus } from '@fortawesome/free-solid-svg-icons';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { formatWeekdays } from '../../utils/weekdayLabels';
@@ -35,8 +35,6 @@ export function ChoreScheduleControl({
 }: ChoreScheduleControlProps) {
   const [editing, setEditing] = useState(false);
 
-  if (!isHead && !schedule) return null;
-
   if (editing) {
     return (
       <ChoreScheduleForm
@@ -55,31 +53,32 @@ export function ChoreScheduleControl({
 
   return (
     <div className="chore-schedule-control">
-      {schedule && <span className="chore-schedule-summary">{RECURRENCE_SUMMARY[schedule.recurrenceType](schedule)}</span>}
-      {isHead && !schedule && (
-        <button type="button" className="btn btn-text" onClick={() => setEditing(true)}>
-          Add schedule
-        </button>
+      {schedule ? (
+        <span className="chore-schedule-pill">
+          {RECURRENCE_SUMMARY[schedule.recurrenceType](schedule)}
+          {isHead && (
+            <button
+              type="button"
+              className="chip-remove"
+              disabled={submitting}
+              onClick={onRemove}
+              aria-label="Remove schedule"
+            >
+              ×
+            </button>
+          )}
+        </span>
+      ) : (
+        <span className="chore-schedule-summary">No schedule</span>
       )}
-      {isHead && schedule && (
+      {isHead && (
         <button
           type="button"
-          className="chore-schedule-icon-btn"
+          className="assign-add-btn"
           onClick={() => setEditing(true)}
-          aria-label="Edit schedule"
+          aria-label={schedule ? 'Edit schedule' : 'Add schedule'}
         >
-          <FontAwesomeIcon icon={faPenToSquare} />
-        </button>
-      )}
-      {isHead && schedule && (
-        <button
-          type="button"
-          className="chore-schedule-icon-btn chore-schedule-icon-btn-remove"
-          disabled={submitting}
-          onClick={onRemove}
-          aria-label="Remove schedule"
-        >
-          <FontAwesomeIcon icon={faXmark} />
+          <FontAwesomeIcon icon={faCalendarPlus} />
         </button>
       )}
     </div>

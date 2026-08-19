@@ -1,4 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCalendarPlus } from '@fortawesome/free-solid-svg-icons';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import type { ScheduleInput } from '../../types/schedule';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
@@ -71,8 +73,13 @@ export function BulkScheduleBar({
       {selectedCount > 0 && !applying && (
         <>
           <span className="bulk-schedule-count">{selectedCount} selected</span>
-          <button type="button" className="btn btn-pill-outline" onClick={() => setApplying(true)}>
-            Apply schedule to {selectedCount} selected
+          <button
+            type="button"
+            className="btn btn-pill-outline"
+            onClick={() => setApplying(true)}
+            aria-label={`Apply schedule to ${selectedCount} selected`}
+          >
+            <FontAwesomeIcon icon={faCalendarPlus} />
           </button>
         </>
       )}
