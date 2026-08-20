@@ -28,7 +28,7 @@ export const startTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Ex
 export const weekdaySchema = z.number().int().min(0).max(6);
 export const overdueAfterUnitSchema = z.enum(['minutes', 'hours', 'days']);
 
-const overdueAfterSchema = z
+export const overdueAfterSchema = z
   .object({
     amount: z.number().int().min(1).max(999),
     unit: overdueAfterUnitSchema,

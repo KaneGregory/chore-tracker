@@ -1,15 +1,8 @@
 import { z } from 'zod';
-import { overdueAfterUnitSchema, startTimeSchema, weekdaySchema } from './scheduleSchemas.js';
+import { overdueAfterSchema, startTimeSchema, weekdaySchema } from './scheduleSchemas.js';
 import { idParam } from './householdSchemas.js';
 
 const scheduleTemplateNameSchema = z.string().trim().min(1).max(60);
-
-const overdueAfterSchema = z
-  .object({
-    amount: z.number().int().min(1).max(999),
-    unit: overdueAfterUnitSchema,
-  })
-  .optional();
 
 const everyNDaysScheduleTemplateSchema = z.object({
   recurrenceType: z.literal('every_n_days'),
