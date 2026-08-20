@@ -1182,6 +1182,16 @@ fieldset.form-field legend,
   padding: 6px 10px;
 }
 
+.overdue-after-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.overdue-after-inputs input {
+  flex: 1;
+  min-width: 0;
+}
+
 .weekday-picker {
   display: flex;
   flex-wrap: wrap;

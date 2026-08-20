@@ -4,6 +4,7 @@ import { faCalendarPlus } from '@fortawesome/free-solid-svg-icons';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { formatWeekdays } from '../../utils/weekdayLabels';
+import { formatOverdueAfter } from '../../utils/overdueAfterLabel';
 import { Modal } from '../common/Modal';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
@@ -55,11 +56,19 @@ export function ChoreScheduleControl({
     );
   }
 
+  const summaryText = schedule
+    ? (() => {
+        const base = RECURRENCE_SUMMARY[schedule.recurrenceType](schedule);
+        const overdueSuffix = formatOverdueAfter(schedule.overdueAfter);
+        return overdueSuffix ? `${base} · ${overdueSuffix}` : base;
+      })()
+    : '';
+
   return (
     <div className="chore-schedule-control">
       {schedule ? (
         <span className="chore-schedule-pill">
-          {RECURRENCE_SUMMARY[schedule.recurrenceType](schedule)}
+          {summaryText}
           {isHead && (
             <button
               type="button"
