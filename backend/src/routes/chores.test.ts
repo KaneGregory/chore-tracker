@@ -1443,6 +1443,30 @@ describe('chore schedules', () => {
     expect(response.body.schedule.overdueAfter).toEqual({ amount: 2, unit: 'days' });
   });
 
+  it('sets an overdue timer alongside a schedule on a specific chore zone', async () => {
+    const head = await registerHeadOfHousehold('sched-overdue-zone-hoh@example.com', 'Overdue Timer Zone House');
+    const rootZoneId = await getRootZoneId(head.householdId, head.cookie);
+    const kitchenZoneId = await createZone(head.householdId, head.cookie, 'Kitchen', rootZoneId);
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Wipe counters', zoneIds: [kitchenZoneId] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/zones/${kitchenZoneId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'once',
+        startDate: '2030-06-01',
+        startTime: '09:00',
+        overdueAfter: { amount: 2, unit: 'days' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.schedule.overdueAfter).toEqual({ amount: 2, unit: 'days' });
+  });
+
   it('computes overdueAt immediately when the target is already to-do', async () => {
     const head = await registerHeadOfHousehold('sched-overdue-now-hoh@example.com', 'Overdue Now House');
     const before = Date.now();

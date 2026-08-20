@@ -192,6 +192,19 @@ describe('setChoreZoneStatus', () => {
     const row = db.select().from(choreZones).where(eq(choreZones.choreId, choreId)).get()!;
     expect(row.todoSince).toBeGreaterThanOrEqual(before);
   });
+
+  it("recomputes overdueAt on the chore zone's schedule when it becomes to-do", () => {
+    const choreId = insertChore('to-do');
+    const zoneId = insertZone();
+    const zoneLinkId = insertChoreZone(choreId, zoneId, 'complete', null);
+    const schedule = insertScheduleWithOverdueTimer({ choreZoneId: zoneLinkId }, 2, 'hours');
+    const before = Date.now();
+
+    choreService.setChoreZoneStatus(householdId, choreId, zoneId, userId, 'to-do');
+
+    const row = db.select().from(choreSchedules).where(eq(choreSchedules.id, schedule.id)).get()!;
+    expect(row.overdueAt).toBeGreaterThanOrEqual(before + 2 * 60 * 60 * 1000);
+  });
 });
 
 describe('systemReopenChore', () => {
@@ -216,6 +229,36 @@ describe('systemReopenChore', () => {
 
     expect(result).toBe(false);
     const row = db.select().from(chores).where(eq(chores.id, choreId)).get()!;
+    expect(row.todoSince).toBe(1000);
+  });
+});
+
+describe('systemReopenChoreZone', () => {
+  it('sets todoSince and recomputes overdueAt when reopening', () => {
+    const choreId = insertChore('to-do');
+    const zoneId = insertZone();
+    const zoneLinkId = insertChoreZone(choreId, zoneId, 'complete', null);
+    const schedule = insertScheduleWithOverdueTimer({ choreZoneId: zoneLinkId }, 30, 'minutes');
+    const before = Date.now();
+
+    const result = choreService.systemReopenChoreZone(choreId, zoneId);
+
+    expect(result).toBe(true);
+    const zoneRow = db.select().from(choreZones).where(eq(choreZones.id, zoneLinkId)).get()!;
+    expect(zoneRow.todoSince).toBeGreaterThanOrEqual(before);
+    const scheduleRow = db.select().from(choreSchedules).where(eq(choreSchedules.id, schedule.id)).get()!;
+    expect(scheduleRow.overdueAt).toBeGreaterThanOrEqual(before + 30 * 60 * 1000);
+  });
+
+  it('does nothing when the zone link is not complete', () => {
+    const choreId = insertChore('to-do');
+    const zoneId = insertZone();
+    insertChoreZone(choreId, zoneId, 'overdue', 1000);
+
+    const result = choreService.systemReopenChoreZone(choreId, zoneId);
+
+    expect(result).toBe(false);
+    const row = db.select().from(choreZones).where(eq(choreZones.choreId, choreId)).get()!;
     expect(row.todoSince).toBe(1000);
   });
 });
