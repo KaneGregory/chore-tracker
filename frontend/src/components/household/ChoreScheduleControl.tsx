@@ -41,6 +41,7 @@ export function ChoreScheduleControl({
         schedule={schedule}
         scheduleTemplates={scheduleTemplates}
         submitting={submitting}
+        hasExistingSchedule={schedule !== null}
         onSave={(input) => {
           onSave(input);
           setEditing(false);

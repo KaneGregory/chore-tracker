@@ -1097,6 +1097,19 @@ fieldset.form-field legend,
   background: var(--paper);
 }
 
+.schedule-replace-warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--tape) 35%, transparent);
+  border: 2px solid var(--tape);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .schedule-field {
   display: flex;
   flex-direction: column;

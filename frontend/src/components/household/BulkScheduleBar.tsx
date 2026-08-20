@@ -8,6 +8,10 @@ import { ChoreScheduleForm } from './ChoreScheduleForm';
 interface BulkScheduleBarProps {
   isHead: boolean;
   selectedCount: number;
+  // Whether any currently-selected target already has a schedule — gates the
+  // replace-confirmation step in ChoreScheduleForm (see its hasExistingSchedule
+  // prop), since applying here would silently overwrite it otherwise.
+  hasExistingSchedule: boolean;
   scheduleTemplates: ScheduleTemplate[];
   submitting: boolean;
   resultMessage: string | null;
@@ -25,6 +29,7 @@ interface BulkScheduleBarProps {
 export function BulkScheduleBar({
   isHead,
   selectedCount,
+  hasExistingSchedule,
   scheduleTemplates,
   submitting,
   resultMessage,
@@ -89,6 +94,7 @@ export function BulkScheduleBar({
           schedule={null}
           scheduleTemplates={scheduleTemplates}
           submitting={submitting}
+          hasExistingSchedule={hasExistingSchedule}
           onSave={(input) => void handleApply(input)}
           onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
           onCancel={() => setApplying(false)}

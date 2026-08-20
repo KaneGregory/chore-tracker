@@ -8,6 +8,13 @@ interface ChoreScheduleFormProps {
   schedule: Schedule | null;
   scheduleTemplates: ScheduleTemplate[];
   submitting: boolean;
+  // Whether saving here would silently overwrite a schedule that already exists —
+  // either this exact target's own schedule (ChoreScheduleControl.tsx) or, in a
+  // bulk-apply, any one of the selected targets' schedules (BulkScheduleBar.tsx).
+  // Shown as an upfront warning (see the banner below) rather than a confirm-on-
+  // submit step, so the user sees it before filling in the rest of the form, not
+  // after.
+  hasExistingSchedule: boolean;
   onSave: (input: ScheduleInput) => void;
   onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) => void;
   onCancel: () => void;
@@ -19,6 +26,7 @@ export function ChoreScheduleForm({
   schedule,
   scheduleTemplates,
   submitting,
+  hasExistingSchedule,
   onSave,
   onSaveAsScheduleTemplate,
   onCancel,
@@ -83,25 +91,24 @@ export function ChoreScheduleForm({
     }
   }
 
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!startDate) return;
+  function buildScheduleInput(): ScheduleInput | undefined {
+    if (!startDate) return undefined;
 
     switch (recurrenceType) {
       case 'once':
-        onSave({ recurrenceType, startDate, startTime });
-        break;
+        return { recurrenceType, startDate, startTime };
       case 'every_n_days':
-        onSave({ recurrenceType, startDate, startTime, intervalDays });
-        break;
+        return { recurrenceType, startDate, startTime, intervalDays };
       case 'weekly':
-        if (weekdays.size === 0) return;
-        onSave({ recurrenceType, startDate, startTime, intervalWeeks, weekdays: [...weekdays] });
-        break;
+        if (weekdays.size === 0) return undefined;
+        return { recurrenceType, startDate, startTime, intervalWeeks, weekdays: [...weekdays] };
       case 'monthly':
-        onSave({ recurrenceType, startDate, startTime, intervalMonths });
-        break;
+        return { recurrenceType, startDate, startTime, intervalMonths };
     }
+  }
+
+  function finalizeSave(input: ScheduleInput) {
+    onSave(input);
 
     const trimmedName = scheduleTemplateName.trim();
     if (saveAsScheduleTemplate && trimmedName) {
@@ -110,8 +117,22 @@ export function ChoreScheduleForm({
     }
   }
 
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const input = buildScheduleInput();
+    if (!input) return;
+    finalizeSave(input);
+  }
+
   return (
     <form className="chore-schedule-form" onSubmit={handleSubmit}>
+      {hasExistingSchedule && (
+        <div className="schedule-replace-warning" role="alert">
+          <span aria-hidden="true">⚠</span>
+          <span>This will replace the existing schedule(s).</span>
+        </div>
+      )}
+
       {scheduleTemplates.length > 0 && (
         <label className="schedule-field">
           Use a saved schedule

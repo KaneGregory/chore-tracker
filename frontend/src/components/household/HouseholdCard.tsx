@@ -330,6 +330,9 @@ export function HouseholdCard({
   const scheduleByTarget = new Map<string, Schedule>(
     schedules.map((schedule) => [`${schedule.choreId}:${schedule.zoneId ?? 'none'}`, schedule]),
   );
+  const selectedTargetsIncludeExistingSchedule = [...selectedTargets].some((key) =>
+    scheduleByTarget.has(key),
+  );
 
   return (
     <>
@@ -339,6 +342,7 @@ export function HouseholdCard({
           <BulkScheduleBar
             isHead={isHead}
             selectedCount={selectedTargets.size}
+            hasExistingSchedule={selectedTargetsIncludeExistingSchedule}
             scheduleTemplates={scheduleTemplates}
             submitting={bulkSubmitting}
             resultMessage={bulkResultMessage}
