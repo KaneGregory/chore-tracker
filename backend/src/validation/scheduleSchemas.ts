@@ -26,11 +26,20 @@ const startDateSchema = z
   .refine(isReasonableStartDate, 'Start date must be a real calendar date, not more than a year in the past');
 export const startTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM');
 export const weekdaySchema = z.number().int().min(0).max(6);
+export const overdueAfterUnitSchema = z.enum(['minutes', 'hours', 'days']);
+
+const overdueAfterSchema = z
+  .object({
+    amount: z.number().int().min(1).max(999),
+    unit: overdueAfterUnitSchema,
+  })
+  .optional();
 
 const onceScheduleSchema = z.object({
   recurrenceType: z.literal('once'),
   startDate: startDateSchema,
   startTime: startTimeSchema,
+  overdueAfter: overdueAfterSchema,
 });
 
 const everyNDaysScheduleSchema = z.object({
@@ -38,6 +47,7 @@ const everyNDaysScheduleSchema = z.object({
   startDate: startDateSchema,
   startTime: startTimeSchema,
   intervalDays: z.number().int().min(1).max(365),
+  overdueAfter: overdueAfterSchema,
 });
 
 const weeklyScheduleSchema = z.object({
@@ -46,6 +56,7 @@ const weeklyScheduleSchema = z.object({
   startTime: startTimeSchema,
   intervalWeeks: z.number().int().min(1).max(52),
   weekdays: z.array(weekdaySchema).min(1).max(7),
+  overdueAfter: overdueAfterSchema,
 });
 
 // dayOfMonth is deliberately not a client-supplied field — it's derived from
@@ -55,6 +66,7 @@ const monthlyScheduleSchema = z.object({
   startDate: startDateSchema,
   startTime: startTimeSchema,
   intervalMonths: z.number().int().min(1).max(24),
+  overdueAfter: overdueAfterSchema,
 });
 
 export const setScheduleSchema = z.discriminatedUnion('recurrenceType', [
