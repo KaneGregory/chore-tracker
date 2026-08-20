@@ -88,6 +88,7 @@ describe('schedule templates', () => {
       weekdays: null,
       intervalMonths: null,
       dayOfMonth: null,
+      overdueAfter: null,
     });
 
     const listResponse = await request(app)
@@ -266,5 +267,23 @@ describe('schedule templates', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.scheduleTemplate.weekdays).toEqual([1, 3, 5]);
+  });
+
+  it('carries an overdue timer on a schedule template', async () => {
+    const head = await registerHeadOfHousehold('template-overdue-hoh@example.com', 'Overdue Template House');
+
+    const response = await request(app)
+      .post(`/api/households/${head.householdId}/schedule-templates`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'every_n_days',
+        name: 'With overdue timer',
+        startTime: '09:00',
+        intervalDays: 1,
+        overdueAfter: { amount: 3, unit: 'hours' },
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.scheduleTemplate.overdueAfter).toEqual({ amount: 3, unit: 'hours' });
   });
 });

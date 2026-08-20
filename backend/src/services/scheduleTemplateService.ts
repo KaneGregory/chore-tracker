@@ -5,6 +5,7 @@ import type { ScheduleTemplateRecurrenceType } from '../db/schema.js';
 import { ScheduleTemplateNotFoundError } from '../errors.js';
 import { requireHeadMembership, requireMembership } from './membershipAuth.js';
 import type { CreateScheduleTemplateInput } from '../validation/scheduleTemplateSchemas.js';
+import type { OverdueAfterUnit } from './scheduleTime.js';
 
 export interface ScheduleTemplate {
   id: number;
@@ -16,6 +17,7 @@ export interface ScheduleTemplate {
   weekdays: number[] | null;
   intervalMonths: number | null;
   dayOfMonth: number | null;
+  overdueAfter: { amount: number; unit: OverdueAfterUnit } | null;
 }
 
 type ScheduleTemplateRow = typeof scheduleTemplates.$inferSelect;
@@ -31,6 +33,10 @@ function toSummary(row: ScheduleTemplateRow): ScheduleTemplate {
     weekdays: row.weekdays ? (JSON.parse(row.weekdays) as number[]) : null,
     intervalMonths: row.intervalMonths,
     dayOfMonth: row.dayOfMonth,
+    overdueAfter:
+      row.overdueAfterAmount !== null && row.overdueAfterUnit !== null
+        ? { amount: row.overdueAfterAmount, unit: row.overdueAfterUnit }
+        : null,
   };
 }
 
@@ -107,6 +113,8 @@ export function createScheduleTemplate(
       name: input.name,
       startTime: input.startTime,
       ...values,
+      overdueAfterAmount: input.overdueAfter?.amount ?? null,
+      overdueAfterUnit: input.overdueAfter?.unit ?? null,
       createdAt: Date.now(),
     })
     .returning()

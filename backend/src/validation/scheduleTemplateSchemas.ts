@@ -1,14 +1,22 @@
 import { z } from 'zod';
-import { startTimeSchema, weekdaySchema } from './scheduleSchemas.js';
+import { overdueAfterUnitSchema, startTimeSchema, weekdaySchema } from './scheduleSchemas.js';
 import { idParam } from './householdSchemas.js';
 
 const scheduleTemplateNameSchema = z.string().trim().min(1).max(60);
+
+const overdueAfterSchema = z
+  .object({
+    amount: z.number().int().min(1).max(999),
+    unit: overdueAfterUnitSchema,
+  })
+  .optional();
 
 const everyNDaysScheduleTemplateSchema = z.object({
   recurrenceType: z.literal('every_n_days'),
   name: scheduleTemplateNameSchema,
   startTime: startTimeSchema,
   intervalDays: z.number().int().min(1).max(365),
+  overdueAfter: overdueAfterSchema,
 });
 
 const weeklyScheduleTemplateSchema = z.object({
@@ -17,6 +25,7 @@ const weeklyScheduleTemplateSchema = z.object({
   startTime: startTimeSchema,
   intervalWeeks: z.number().int().min(1).max(52),
   weekdays: z.array(weekdaySchema).min(1).max(7),
+  overdueAfter: overdueAfterSchema,
 });
 
 // dayOfMonth is a required client-supplied field here — unlike setScheduleSchema's
@@ -28,6 +37,7 @@ const monthlyScheduleTemplateSchema = z.object({
   startTime: startTimeSchema,
   intervalMonths: z.number().int().min(1).max(24),
   dayOfMonth: z.number().int().min(1).max(31),
+  overdueAfter: overdueAfterSchema,
 });
 
 export const createScheduleTemplateSchema = z.discriminatedUnion('recurrenceType', [
