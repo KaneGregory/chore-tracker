@@ -1445,12 +1445,12 @@ describe('chore schedules', () => {
 
   it('computes overdueAt immediately when the target is already to-do', async () => {
     const head = await registerHeadOfHousehold('sched-overdue-now-hoh@example.com', 'Overdue Now House');
+    const before = Date.now();
     const choreResponse = await request(app)
       .post(`/api/households/${head.householdId}/chores`)
       .set('Cookie', head.cookie)
       .send({ name: 'Fresh to-do chore', zoneIds: [] });
     const choreId = choreResponse.body.chore.id;
-    const before = Date.now();
 
     const response = await request(app)
       .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
