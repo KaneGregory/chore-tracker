@@ -6,14 +6,21 @@ import { eq } from 'drizzle-orm';
 
 const systemReopenChore = vi.fn();
 const systemReopenChoreZone = vi.fn();
-vi.mock('./choreService.js', () => ({ systemReopenChore, systemReopenChoreZone }));
+const systemMarkOverdue = vi.fn();
+const systemMarkOverdueZone = vi.fn();
+vi.mock('./choreService.js', () => ({
+  systemReopenChore,
+  systemReopenChoreZone,
+  systemMarkOverdue,
+  systemMarkOverdueZone,
+}));
 
 const testDir = mkdtempSync(join(tmpdir(), 'chore-tracker-chore-scheduler-'));
 process.env.DB_FILE = join(testDir, 'test.db');
 
 const { runMigrations, sqlite, db } = await import('../db/client.js');
 const { users, households, chores, choreZones, choreSchedules, zones } = await import('../db/schema.js');
-const { checkSchedules } = await import('./choreScheduler.js');
+const { checkSchedules, checkOverdueSchedules } = await import('./choreScheduler.js');
 
 runMigrations();
 
@@ -44,6 +51,8 @@ beforeAll(() => {
 beforeEach(() => {
   systemReopenChore.mockReset();
   systemReopenChoreZone.mockReset();
+  systemMarkOverdue.mockReset();
+  systemMarkOverdueZone.mockReset();
   db.delete(choreSchedules).run();
   db.delete(choreZones).run();
   db.delete(chores).run();
@@ -92,6 +101,34 @@ function insertSchedule(overrides: {
       intervalMonths: null,
       dayOfMonth: null,
       nextRunAt: overrides.nextRunAt,
+      createdAt: now,
+    })
+    .returning({ id: choreSchedules.id })
+    .get();
+}
+
+function insertScheduleWithOverdueAt(overrides: {
+  choreId?: number | null;
+  choreZoneId?: number | null;
+  overdueAt: number;
+}) {
+  const now = Date.now();
+  return db
+    .insert(choreSchedules)
+    .values({
+      choreId: overrides.choreId ?? null,
+      choreZoneId: overrides.choreZoneId ?? null,
+      recurrenceType: 'once',
+      startAt: now,
+      intervalDays: null,
+      intervalWeeks: null,
+      weekdays: null,
+      intervalMonths: null,
+      dayOfMonth: null,
+      overdueAfterAmount: 1,
+      overdueAfterUnit: 'hours',
+      overdueAt: overrides.overdueAt,
+      nextRunAt: null,
       createdAt: now,
     })
     .returning({ id: choreSchedules.id })
@@ -208,5 +245,69 @@ describe('checkSchedules', () => {
     expect(systemReopenChore).toHaveBeenCalledWith(otherChoreId);
     const validRow = db.select().from(choreSchedules).where(eq(choreSchedules.id, valid.id)).get();
     expect(validRow?.nextRunAt).toBe(Date.UTC(2026, 0, 2, 9, 0));
+  });
+});
+
+describe('checkOverdueSchedules', () => {
+  it('marks a zoneless chore overdue when its timer is due', () => {
+    const schedule = insertScheduleWithOverdueAt({ choreId, overdueAt: Date.UTC(2026, 0, 1, 9, 0) });
+    systemMarkOverdue.mockReturnValue(true);
+
+    checkOverdueSchedules(Date.UTC(2026, 0, 1, 9, 0));
+
+    expect(systemMarkOverdue).toHaveBeenCalledWith(choreId);
+    const row = db.select().from(choreSchedules).where(eq(choreSchedules.id, schedule.id)).get();
+    expect(row?.overdueAt).toBeNull();
+  });
+
+  it('marks a specific chore zone overdue when its timer is due', () => {
+    const schedule = insertScheduleWithOverdueAt({ choreZoneId: choreZoneRowId, overdueAt: Date.UTC(2026, 0, 1, 9, 0) });
+    systemMarkOverdueZone.mockReturnValue(true);
+
+    checkOverdueSchedules(Date.UTC(2026, 0, 1, 9, 0));
+
+    expect(systemMarkOverdueZone).toHaveBeenCalledWith(choreId, zoneId);
+    const row = db.select().from(choreSchedules).where(eq(choreSchedules.id, schedule.id)).get();
+    expect(row?.overdueAt).toBeNull();
+  });
+
+  it('does nothing before overdueAt', () => {
+    insertScheduleWithOverdueAt({ choreId, overdueAt: Date.UTC(2026, 0, 1, 9, 0) });
+
+    checkOverdueSchedules(Date.UTC(2026, 0, 1, 8, 0));
+
+    expect(systemMarkOverdue).not.toHaveBeenCalled();
+  });
+
+  it('clears overdueAt even when the firing rule was a no-op (already completed in time)', () => {
+    const schedule = insertScheduleWithOverdueAt({ choreId, overdueAt: Date.UTC(2026, 0, 1, 9, 0) });
+    systemMarkOverdue.mockReturnValue(false);
+
+    checkOverdueSchedules(Date.UTC(2026, 0, 1, 9, 0));
+
+    expect(systemMarkOverdue).toHaveBeenCalledWith(choreId);
+    const row = db.select().from(choreSchedules).where(eq(choreSchedules.id, schedule.id)).get();
+    expect(row?.overdueAt).toBeNull();
+  });
+
+  it('does not touch a schedule whose overdueAt is null', () => {
+    insertSchedule({ choreId, nextRunAt: Date.UTC(2026, 0, 1, 9, 0) });
+
+    checkOverdueSchedules(Date.UTC(2026, 0, 1, 9, 0));
+
+    expect(systemMarkOverdue).not.toHaveBeenCalled();
+    expect(systemMarkOverdueZone).not.toHaveBeenCalled();
+  });
+
+  it('disables a malformed row after an error instead of crashing the whole pass', () => {
+    systemMarkOverdue.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    const broken = insertScheduleWithOverdueAt({ choreId, overdueAt: Date.UTC(2026, 0, 1, 9, 0) });
+
+    expect(() => checkOverdueSchedules(Date.UTC(2026, 0, 1, 9, 0))).not.toThrow();
+
+    const row = db.select().from(choreSchedules).where(eq(choreSchedules.id, broken.id)).get();
+    expect(row?.overdueAt).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import { db } from '../db/client.js';
 import { choreSchedules, choreZones, chores, households } from '../db/schema.js';
 import { advanceUntilFuture } from './scheduleTime.js';
 import type { ScheduleRecurrence } from './scheduleTime.js';
-import { systemReopenChore, systemReopenChoreZone } from './choreService.js';
+import { systemReopenChore, systemReopenChoreZone, systemMarkOverdue, systemMarkOverdueZone } from './choreService.js';
 
 const CHECK_INTERVAL_MS = 60_000;
 
@@ -94,11 +94,45 @@ export function checkSchedules(now: number = Date.now()): void {
   }
 }
 
+// A one-shot deadline check, unlike checkSchedules' repeating cadence — overdueAt
+// is cleared here regardless of outcome (fired or no-op), and only gets a new
+// value the next time the target actually becomes 'to-do' again (see
+// choreService.ts / scheduleService.refreshOverdueAtForTarget). Same per-row
+// error isolation as checkSchedules, for the same reason.
+export function checkOverdueSchedules(now: number = Date.now()): void {
+  const due = db
+    .select()
+    .from(choreSchedules)
+    .where(and(isNotNull(choreSchedules.overdueAt), lte(choreSchedules.overdueAt, now)))
+    .all();
+
+  for (const row of due) {
+    try {
+      const target = resolveTarget(row);
+      if (!target) continue;
+
+      if (target.zoneId === null) {
+        systemMarkOverdue(target.choreId);
+      } else {
+        systemMarkOverdueZone(target.choreId, target.zoneId);
+      }
+
+      db.update(choreSchedules).set({ overdueAt: null }).where(eq(choreSchedules.id, row.id)).run();
+    } catch (err) {
+      console.error(`choreScheduler: disabling overdue timer on schedule ${row.id} after an error`, err);
+      db.update(choreSchedules).set({ overdueAt: null }).where(eq(choreSchedules.id, row.id)).run();
+    }
+  }
+}
+
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 export function startChoreScheduler(): void {
   if (intervalHandle) return;
-  intervalHandle = setInterval(() => checkSchedules(), CHECK_INTERVAL_MS);
+  intervalHandle = setInterval(() => {
+    checkSchedules();
+    checkOverdueSchedules();
+  }, CHECK_INTERVAL_MS);
 }
 
 export function stopChoreScheduler(): void {
