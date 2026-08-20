@@ -396,9 +396,11 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
 * Chores (and, separately, each `chore_zones` link) can carry a schedule
   (`chore_schedules` table, migration `0013`) that automatically flips status back to
   `to-do` without a human clicking anything — the first phase of a larger "scheduling"
-  feature; a second phase (a `to-do` → `overdue` rule) is designed but not built, see
+  feature; a second phase (a `to-do` → `overdue` rule, the "overdue timer") is now
+  also built, see
   `docs/superpowers/specs/2026-08-13-scheduling-design.md` and
-  `docs/superpowers/plans/2026-08-13-scheduling-phase1.md`. A schedule is exactly one
+  `docs/superpowers/plans/2026-08-13-scheduling-phase1.md` for phase 1, and the
+  overdue-timer bullet below for phase 2. A schedule is exactly one
   of four types (`'once' | 'every_n_days' | 'weekly' | 'monthly'`), targets either a
   whole zoneless chore or one specific `chore_zones` link (mirroring the same
   zoned/zoneless split `chores.status`/`chore_zones.status` already use), and there's
@@ -440,6 +442,46 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   spec, decided during planning specifically to avoid touching `choreService.ts`'s
   `attachDetails`/`ChoreSummary` and rewriting the existing exact-shape `toEqual`
   assertions in `routes/chores.test.ts` for no behavioral difference to the user.
+* Phase 2 of scheduling ("overdue timer", migration `0015`, see
+  `docs/superpowers/specs/2026-08-20-overdue-timer-design.md` and
+  `docs/superpowers/plans/2026-08-20-overdue-timer-phase2.md`) lets a schedule also
+  carry an optional amount+unit duration (`chore_schedules.overdueAfterAmount`/
+  `overdueAfterUnit`, minutes/hours/days) after which a still-`'to-do'` target
+  automatically flips to `'overdue'`. It's built on two new nullable `todoSince`
+  columns (`chores.todoSince`/`choreZones.todoSince`, epoch ms) tracking "when did
+  this most recently become `'to-do'`" — written in every status-mutation path in
+  `choreService.ts` (`setChoreStatus`, `setChoreZoneStatus`, `systemReopenChore`,
+  `systemReopenChoreZone`, and `createChore` at creation time), and only on a *real*
+  transition into `'to-do'` from some other status, never a redundant
+  `'to-do'` → `'to-do'` write — the same distinction `notificationBatcher.ts` already
+  draws for reopen notifications. `chore_schedules.overdueAt` (epoch ms, nullable,
+  indexed) is the precomputed "check at" instant the timer actually fires against,
+  populated by `scheduleService.ts`'s `insertSchedule` (when a schedule with a timer
+  is created/replaced against a target that's currently `'to-do'`) and by its
+  `refreshOverdueAtForTarget` (called from every one of `choreService.ts`'s
+  to-do-transition sites above, whenever that specific call actually changed
+  `todoSince`) — unlike `nextRunAt`'s repeating cadence, `overdueAt` is strictly
+  one-shot: `choreScheduler.ts`'s `checkOverdueSchedules` (same 60-second
+  `setInterval` `checkSchedules` already polls on, not a second timer) clears it back
+  to `null` unconditionally once checked, whether the target was actually flipped
+  (via the new `choreService.systemMarkOverdue`/`systemMarkOverdueZone`, mirroring
+  `systemReopenChore`/`systemReopenChoreZone` and reusing the same
+  `queueOverdueNotification` path a head's manual "Mark overdue" already triggers) or
+  found to already be `'complete'`/`'overdue'` by the time the poll ran — it only gets
+  a next value the following time the target genuinely re-enters `'to-do'`.
+  `overdueAfterAmount`/`overdueAfterUnit` are nullable with no DB-level `CHECK` tying
+  their co-nullability together (unlike `chore_schedules`' existing exactly-one-target
+  `CHECK`) — a deliberate omission: both columns are only ever written together, by
+  exactly one code path each (`scheduleService.insertSchedule` and
+  `scheduleTemplateService.createScheduleTemplate`), already guaranteed paired by Zod
+  (`overdueAfterSchema`, `scheduleSchemas.ts`) before either function runs, so a
+  `CHECK` would only add the risk of a table-recreating migration (per the
+  migration-safety note above) for an invariant that's already fully controlled by
+  its single writer. `schedule_patterns` (schedule templates) carries the same
+  `overdueAfterAmount`/`overdueAfterUnit` pair with the same snapshot semantics as
+  every other field it already carries — applying a template pre-fills the timer
+  along with the recurrence shape, and (like `nextRunAt`) it has no `overdueAt` of its
+  own, since a template is never itself evaluated by the scheduler.
 
 ## All code should be
 
@@ -536,8 +578,25 @@ Run from within `backend/` or `frontend/` unless noted:
   all, though the data is fetched) can go stale between chore-list refreshes. There's
   no way for a head to add a schedule to a chore at creation time — only after the
   chore already exists, via each chore/zone's own "Add schedule" control. Phase 2 (the
-  `to-do` → `overdue` rule) is designed but not built — see
-  `docs/superpowers/specs/2026-08-13-scheduling-design.md`.
+  `to-do` → `overdue` rule, the overdue timer) is now built — see the overdue-timer
+  bullet in "Architectural decisions" and
+  `docs/superpowers/specs/2026-08-20-overdue-timer-design.md`.
+* The overdue-timer's amount input (`ChoreScheduleForm.tsx`/`ScheduleTemplateForm.tsx`)
+  has no client-side clamping beyond the plain HTML `min`/`max` on the number input —
+  an out-of-range or non-integer value is either silently treated as "no timer"
+  (`buildOverdueAfter`'s validation) or rejected outright by the backend's existing
+  400 response (`scheduleSchemas.ts`'s `overdueAfterSchema`), with no friendlier
+  inline validation message shown either way.
+* The automatic `'to-do'` → `'overdue'` flip is invisible in the UI until the page is
+  reloaded — there's no live refetch/polling on the frontend (consistent with
+  `nextRunAt` never being live-rendered either), so a background flip from
+  `choreScheduler.ts`'s poll only becomes visible on the next load. Assignees still
+  get a push notification at the moment it fires, via the same
+  `queueOverdueNotification` path a head's manual "Mark overdue" already uses.
+* Once a chore/zone is `'overdue'`, it stays `'overdue'` until someone manually
+  completes or reopens it — the overdue timer only re-arms on a genuine transition
+  back into `'to-do'` (see `refreshOverdueAtForTarget`), it does not re-fire on its
+  own while sitting `'overdue'`.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a
