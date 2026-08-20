@@ -97,6 +97,12 @@ export const chores = sqliteTable('chores', {
   // Only meaningful when the chore has no zones — a chore with zones takes its status
   // from them instead (see choreService.deriveChoreStatus).
   status: text('status', { enum: CHORE_STATUSES }).notNull().default('to-do'),
+  // Epoch ms, nullable: the instant this chore's status most recently changed
+  // *into* 'to-do' (including at creation, since a chore defaults to 'to-do') —
+  // never touched by a redundant 'to-do' -> 'to-do' write. Drives an overdue
+  // timer's `overdueAt` (see chore_schedules.overdueAt) when one is configured;
+  // otherwise unused. See choreService.ts for every write site.
+  todoSince: integer('todo_since'),
   createdAt: integer('created_at').notNull(),
 });
 
@@ -111,6 +117,9 @@ export const choreZones = sqliteTable(
       .notNull()
       .references(() => zones.id, { onDelete: 'cascade' }),
     status: text('status', { enum: CHORE_STATUSES }).notNull().default('to-do'),
+    // Same role as chores.todoSince, but for this specific zone-link — see that
+    // column's comment.
+    todoSince: integer('todo_since'),
   },
   (table) => [unique().on(table.choreId, table.zoneId)],
 );
@@ -130,6 +139,9 @@ export const choreAssignments = sqliteTable('chore_assignments', {
 
 export const RECURRENCE_TYPES = ['once', 'every_n_days', 'weekly', 'monthly'] as const;
 export type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
+
+export const OVERDUE_AFTER_UNITS = ['minutes', 'hours', 'days'] as const;
+export type OverdueAfterUnit = (typeof OVERDUE_AFTER_UNITS)[number];
 
 // Exactly one schedule per chore/chore-zone (see the two partial unique indexes
 // below) — setting a new one replaces the old rather than layering several. Exactly
@@ -160,6 +172,20 @@ export const choreSchedules = sqliteTable(
     // even after a shorter month clamps one occurrence down (see scheduleTime.ts's
     // monthly step).
     dayOfMonth: integer('day_of_month'),
+    // The configured overdue timer, if any: both null together (no timer) or both
+    // set together (never enforced by a DB CHECK — see the plan's Global
+    // Constraints for why; both are always written together by
+    // scheduleService.insertSchedule).
+    overdueAfterAmount: integer('overdue_after_amount'),
+    overdueAfterUnit: text('overdue_after_unit', { enum: OVERDUE_AFTER_UNITS }),
+    // Epoch ms, nullable, indexed: precomputed "check at" instant for the overdue
+    // timer, mirroring nextRunAt's role for the reopen schedule — recomputed
+    // whenever the target's todoSince changes (see choreService.ts /
+    // scheduleService.refreshOverdueAtForTarget) or a new schedule with a timer is
+    // saved. Cleared to null once choreScheduler.ts's overdue poll has checked it,
+    // whether or not it actually fired — this is a one-shot deadline, not a
+    // repeating cadence like nextRunAt.
+    overdueAt: integer('overdue_at'),
     // Epoch ms, indexed: the next time choreScheduler.ts should act on this schedule.
     // Null means done — a fired 'once' schedule.
     nextRunAt: integer('next_run_at'),
@@ -173,6 +199,7 @@ export const choreSchedules = sqliteTable(
       .on(table.choreZoneId)
       .where(sql`${table.choreZoneId} IS NOT NULL`),
     index('chore_schedules_next_run_at_idx').on(table.nextRunAt),
+    index('chore_schedules_overdue_at_idx').on(table.overdueAt),
     check(
       'chore_schedules_exactly_one_target',
       sql`(${table.choreId} IS NULL) != (${table.choreZoneId} IS NULL)`,
@@ -210,6 +237,12 @@ export const scheduleTemplates = sqliteTable('schedule_patterns', {
   weekdays: text('weekdays'),
   intervalMonths: integer('interval_months'),
   dayOfMonth: integer('day_of_month'),
+  // Same shape as chore_schedules' overdueAfterAmount/overdueAfterUnit — applying
+  // this template pre-fills the overdue timer along with the recurrence shape.
+  // No overdueAt here: a template is never itself evaluated by the scheduler,
+  // same reasoning already applied to it having no startAt/nextRunAt.
+  overdueAfterAmount: integer('overdue_after_amount'),
+  overdueAfterUnit: text('overdue_after_unit', { enum: OVERDUE_AFTER_UNITS }),
   createdAt: integer('created_at').notNull(),
 });
 
