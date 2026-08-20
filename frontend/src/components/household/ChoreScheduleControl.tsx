@@ -4,6 +4,7 @@ import { faCalendarPlus } from '@fortawesome/free-solid-svg-icons';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { formatWeekdays } from '../../utils/weekdayLabels';
+import { Modal } from '../common/Modal';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
 interface ChoreScheduleControlProps {
@@ -37,18 +38,20 @@ export function ChoreScheduleControl({
 
   if (editing) {
     return (
-      <ChoreScheduleForm
-        schedule={schedule}
-        scheduleTemplates={scheduleTemplates}
-        submitting={submitting}
-        hasExistingSchedule={schedule !== null}
-        onSave={(input) => {
-          onSave(input);
-          setEditing(false);
-        }}
-        onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
-        onCancel={() => setEditing(false)}
-      />
+      <Modal title={schedule ? 'Edit Schedule' : 'Add Schedule'} onClose={() => setEditing(false)}>
+        <ChoreScheduleForm
+          schedule={schedule}
+          scheduleTemplates={scheduleTemplates}
+          submitting={submitting}
+          hasExistingSchedule={schedule !== null}
+          onSave={(input) => {
+            onSave(input);
+            setEditing(false);
+          }}
+          onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
+          onCancel={() => setEditing(false)}
+        />
+      </Modal>
     );
   }
 

@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarPlus } from '@fortawesome/free-solid-svg-icons';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import type { ScheduleInput } from '../../types/schedule';
+import { Modal } from '../common/Modal';
 import { ChoreScheduleForm } from './ChoreScheduleForm';
 
 interface BulkScheduleBarProps {
@@ -90,15 +91,17 @@ export function BulkScheduleBar({
       )}
       {resultMessage && <span className="bulk-schedule-result">{resultMessage}</span>}
       {applying && (
-        <ChoreScheduleForm
-          schedule={null}
-          scheduleTemplates={scheduleTemplates}
-          submitting={submitting}
-          hasExistingSchedule={hasExistingSchedule}
-          onSave={(input) => void handleApply(input)}
-          onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
-          onCancel={() => setApplying(false)}
-        />
+        <Modal title="Add Schedule" onClose={() => setApplying(false)}>
+          <ChoreScheduleForm
+            schedule={null}
+            scheduleTemplates={scheduleTemplates}
+            submitting={submitting}
+            hasExistingSchedule={hasExistingSchedule}
+            onSave={(input) => void handleApply(input)}
+            onSaveAsScheduleTemplate={onSaveAsScheduleTemplate}
+            onCancel={() => setApplying(false)}
+          />
+        </Modal>
       )}
     </div>
   );

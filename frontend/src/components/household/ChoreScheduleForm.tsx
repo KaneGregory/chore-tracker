@@ -129,7 +129,7 @@ export function ChoreScheduleForm({
       {hasExistingSchedule && (
         <div className="schedule-replace-warning" role="alert">
           <span aria-hidden="true">⚠</span>
-          <span>This will replace the existing schedule(s).</span>
+          <span>This will replace existing schedule(s).</span>
         </div>
       )}
 
