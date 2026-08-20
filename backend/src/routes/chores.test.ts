@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+import { eq } from 'drizzle-orm';
 
 // Chore mutations queue debounced push notifications via notificationBatcher.ts —
 // mocked here so these tests assert *that* the right person gets queued (synchronous,
@@ -22,7 +23,8 @@ process.env.DB_FILE = join(testDir, 'test.db');
 process.env.SESSION_TTL_DAYS = '30';
 process.env.CORS_ORIGIN = 'http://localhost:5173';
 
-const { runMigrations, sqlite } = await import('../db/client.js');
+const { runMigrations, sqlite, db } = await import('../db/client.js');
+const { choreSchedules } = await import('../db/schema.js');
 const { createApp } = await import('../app.js');
 
 runMigrations();
@@ -1305,6 +1307,7 @@ describe('chore schedules', () => {
       intervalWeeks: null,
       weekdays: null,
       intervalMonths: null,
+      overdueAfter: null,
       nextRunAt: expect.any(Number),
     });
   });
@@ -1416,5 +1419,77 @@ describe('chore schedules', () => {
     expect(response.body.schedules).toEqual([
       expect.objectContaining({ choreId, zoneId: null, recurrenceType: 'every_n_days' }),
     ]);
+  });
+
+  it('sets an overdue timer alongside a schedule', async () => {
+    const head = await registerHeadOfHousehold('sched-overdue-hoh@example.com', 'Overdue Timer House');
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Take out trash', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'once',
+        startDate: '2030-06-01',
+        startTime: '09:00',
+        overdueAfter: { amount: 2, unit: 'days' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.schedule.overdueAfter).toEqual({ amount: 2, unit: 'days' });
+  });
+
+  it('computes overdueAt immediately when the target is already to-do', async () => {
+    const head = await registerHeadOfHousehold('sched-overdue-now-hoh@example.com', 'Overdue Now House');
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Fresh to-do chore', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+    const before = Date.now();
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'once',
+        startDate: '2030-06-01',
+        startTime: '09:00',
+        overdueAfter: { amount: 90, unit: 'minutes' },
+      });
+
+    expect(response.status).toBe(200);
+    // A brand-new chore is 'to-do' from creation, so overdueAt should already be
+    // computed (todoSince ~= creation time) rather than waiting for a later
+    // transition. overdueAt itself isn't in the API response (see design's "no
+    // live countdown" decision) — assert indirectly via the DB.
+    const row = db.select().from(choreSchedules).where(eq(choreSchedules.choreId, choreId)).get();
+    expect(row?.overdueAt).toBeGreaterThanOrEqual(before + 90 * 60 * 1000);
+  });
+
+  it('rejects an overdue timer amount outside 1-999 with 400', async () => {
+    const head = await registerHeadOfHousehold('sched-overdue-invalid-hoh@example.com', 'Invalid Overdue House');
+    const choreResponse = await request(app)
+      .post(`/api/households/${head.householdId}/chores`)
+      .set('Cookie', head.cookie)
+      .send({ name: 'Chore', zoneIds: [] });
+    const choreId = choreResponse.body.chore.id;
+
+    const response = await request(app)
+      .put(`/api/households/${head.householdId}/chores/${choreId}/schedule`)
+      .set('Cookie', head.cookie)
+      .send({
+        recurrenceType: 'once',
+        startDate: '2030-06-01',
+        startTime: '09:00',
+        overdueAfter: { amount: 1000, unit: 'days' },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('ValidationError');
   });
 });

@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { choreSchedules, choreZones, chores, households } from '../db/schema.js';
-import type { RecurrenceType } from '../db/schema.js';
+import type { ChoreStatus, RecurrenceType } from '../db/schema.js';
 import {
   ChoreNotFoundError,
   ChoreScheduleManagedByZonesError,
@@ -9,7 +9,9 @@ import {
 } from '../errors.js';
 import { requireHeadMembership, requireMembership } from './membershipAuth.js';
 import { computeInitialNextRunAt, fromLocalDateTime, toLocalDateTime } from './scheduleTime.js';
+import { overdueDurationMs } from './scheduleTime.js';
 import type { ScheduleRecurrence } from './scheduleTime.js';
+import type { OverdueAfterUnit } from './scheduleTime.js';
 import type { SetScheduleInput } from '../validation/scheduleSchemas.js';
 
 export interface ScheduleSummary {
@@ -20,6 +22,7 @@ export interface ScheduleSummary {
   intervalWeeks: number | null;
   weekdays: number[] | null;
   intervalMonths: number | null;
+  overdueAfter: { amount: number; unit: OverdueAfterUnit } | null;
   nextRunAt: number | null;
 }
 
@@ -42,6 +45,10 @@ function toSummary(row: ScheduleRow, timeZone: string): ScheduleSummary {
     intervalWeeks: row.intervalWeeks,
     weekdays: row.weekdays ? (JSON.parse(row.weekdays) as number[]) : null,
     intervalMonths: row.intervalMonths,
+    overdueAfter:
+      row.overdueAfterAmount !== null && row.overdueAfterUnit !== null
+        ? { amount: row.overdueAfterAmount, unit: row.overdueAfterUnit }
+        : null,
     nextRunAt: row.nextRunAt,
   };
 }
@@ -57,7 +64,7 @@ function getHouseholdTimezone(householdId: number): string {
 
 function findChoreInHousehold(householdId: number, choreId: number) {
   return db
-    .select({ id: chores.id })
+    .select({ id: chores.id, status: chores.status, todoSince: chores.todoSince })
     .from(chores)
     .where(and(eq(chores.id, choreId), eq(chores.householdId, householdId)))
     .get();
@@ -136,6 +143,8 @@ function insertSchedule(
   target: { choreId: number; choreZoneId: null } | { choreId: null; choreZoneId: number },
   input: SetScheduleInput,
   timeZone: string,
+  currentStatus: ChoreStatus,
+  todoSince: number | null,
 ): ScheduleSummary {
   // Both split()+map(Number) results are cast to fixed-length tuples rather than left
   // as number[] — noUncheckedIndexedAccess (tsconfig.json) would otherwise widen each
@@ -149,6 +158,21 @@ function insertSchedule(
   const recurrence = toRecurrence(startAt, values);
   const nextRunAt = computeInitialNextRunAt(recurrence, timeZone, Date.now());
 
+  // Only meaningful while the target is currently 'to-do' — if it's 'complete' or
+  // 'overdue', there's nothing to count down from yet (see the design's firing
+  // rule: overdueAt gets computed fresh the next time the target actually becomes
+  // 'to-do', via choreService.ts calling refreshOverdueAtForTarget). Falls back to
+  // "now" if todoSince is somehow null despite being 'to-do' — shouldn't happen
+  // after the migration 0015 backfill, but costs nothing to guard.
+  const effectiveTodoSince = currentStatus === 'to-do' ? todoSince ?? Date.now() : null;
+  const overdueAt =
+    input.overdueAfter && effectiveTodoSince !== null
+      ? effectiveTodoSince + overdueDurationMs(input.overdueAfter.amount, input.overdueAfter.unit)
+      : null;
+  const overdueValues = input.overdueAfter
+    ? { overdueAfterAmount: input.overdueAfter.amount, overdueAfterUnit: input.overdueAfter.unit, overdueAt }
+    : { overdueAfterAmount: null, overdueAfterUnit: null, overdueAt: null };
+
   const row = db.transaction((tx) => {
     if (target.choreId !== null) {
       tx.delete(choreSchedules).where(eq(choreSchedules.choreId, target.choreId)).run();
@@ -157,12 +181,50 @@ function insertSchedule(
     }
     return tx
       .insert(choreSchedules)
-      .values({ ...target, startAt, ...values, nextRunAt, createdAt: Date.now() })
+      .values({ ...target, startAt, ...values, ...overdueValues, nextRunAt, createdAt: Date.now() })
       .returning()
       .get();
   });
 
   return toSummary(row, timeZone);
+}
+
+// Called by choreService.ts after any real transition into 'to-do' (never on a
+// redundant to-do -> to-do write). No-ops if the target has no schedule row, or
+// its schedule has no overdue timer configured — there's nothing to recompute.
+export function refreshOverdueAtForTarget(
+  choreId: number,
+  zoneId: number | null,
+  todoSince: number,
+): void {
+  const scheduleRowId =
+    zoneId === null
+      ? db.select({ id: choreSchedules.id }).from(choreSchedules).where(eq(choreSchedules.choreId, choreId)).get()
+          ?.id
+      : (() => {
+          const link = db
+            .select({ id: choreZones.id })
+            .from(choreZones)
+            .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
+            .get();
+          if (!link) return undefined;
+          return db
+            .select({ id: choreSchedules.id })
+            .from(choreSchedules)
+            .where(eq(choreSchedules.choreZoneId, link.id))
+            .get()?.id;
+        })();
+  if (scheduleRowId === undefined) return;
+
+  const schedule = db
+    .select({ overdueAfterAmount: choreSchedules.overdueAfterAmount, overdueAfterUnit: choreSchedules.overdueAfterUnit })
+    .from(choreSchedules)
+    .where(eq(choreSchedules.id, scheduleRowId))
+    .get()!;
+  if (schedule.overdueAfterAmount === null || schedule.overdueAfterUnit === null) return;
+
+  const overdueAt = todoSince + overdueDurationMs(schedule.overdueAfterAmount, schedule.overdueAfterUnit);
+  db.update(choreSchedules).set({ overdueAt }).where(eq(choreSchedules.id, scheduleRowId)).run();
 }
 
 export function setScheduleForChore(
@@ -177,7 +239,13 @@ export function setScheduleForChore(
   if (!chore) throw new ChoreNotFoundError();
   if (choreHasAnyZoneLink(choreId)) throw new ChoreScheduleManagedByZonesError();
 
-  return insertSchedule({ choreId, choreZoneId: null }, input, getHouseholdTimezone(householdId));
+  return insertSchedule(
+    { choreId, choreZoneId: null },
+    input,
+    getHouseholdTimezone(householdId),
+    chore.status,
+    chore.todoSince,
+  );
 }
 
 export function removeScheduleForChore(
@@ -206,7 +274,7 @@ export function setScheduleForChoreZone(
   if (!chore) throw new ChoreNotFoundError();
 
   const link = db
-    .select({ id: choreZones.id })
+    .select({ id: choreZones.id, status: choreZones.status, todoSince: choreZones.todoSince })
     .from(choreZones)
     .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
     .get();
@@ -216,6 +284,8 @@ export function setScheduleForChoreZone(
     { choreId: null, choreZoneId: link.id },
     input,
     getHouseholdTimezone(householdId),
+    link.status,
+    link.todoSince,
   );
 }
 
