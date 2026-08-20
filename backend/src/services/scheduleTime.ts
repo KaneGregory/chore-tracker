@@ -1,6 +1,9 @@
 import type { RecurrenceType } from '../db/schema.js';
 export type { RecurrenceType };
 
+import type { OverdueAfterUnit } from '../db/schema.js';
+export type { OverdueAfterUnit };
+
 export interface LocalDateTime {
   year: number;
   month: number; // 1-12
@@ -17,6 +20,24 @@ export interface ScheduleRecurrence {
   weekdays: number[] | null;
   intervalMonths: number | null;
   dayOfMonth: number | null;
+}
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS_FOR_OVERDUE = 24 * HOUR_MS;
+
+// Plain duration math, deliberately with no timezone/calendar involvement — unlike
+// every_n_days/weekly/monthly, a minutes/hours/days overdue timer is a fixed-length
+// span from an instant, not a calendar-relative step.
+export function overdueDurationMs(amount: number, unit: OverdueAfterUnit): number {
+  switch (unit) {
+    case 'minutes':
+      return amount * MINUTE_MS;
+    case 'hours':
+      return amount * HOUR_MS;
+    case 'days':
+      return amount * DAY_MS_FOR_OVERDUE;
+  }
 }
 
 function formatPart(parts: Intl.DateTimeFormatPart[], type: string): string {

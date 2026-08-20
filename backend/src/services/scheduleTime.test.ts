@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toLocalDateTime, weekdayOf } from './scheduleTime.js';
+import { toLocalDateTime, weekdayOf, overdueDurationMs } from './scheduleTime.js';
 
 describe('toLocalDateTime', () => {
   it('reads UTC components directly', () => {
@@ -291,5 +291,19 @@ describe('monthly recurrence', () => {
     expect(feb).toBe(Date.UTC(2026, 1, 28, 9, 0)); // 2026 is not a leap year
     const mar = advanceUntilFuture(schedule, 'UTC', feb, feb);
     expect(mar).toBe(Date.UTC(2026, 2, 31, 9, 0)); // back to the 31st in March
+  });
+});
+
+describe('overdueDurationMs', () => {
+  it('converts minutes to ms', () => {
+    expect(overdueDurationMs(90, 'minutes')).toBe(90 * 60 * 1000);
+  });
+
+  it('converts hours to ms', () => {
+    expect(overdueDurationMs(3, 'hours')).toBe(3 * 60 * 60 * 1000);
+  });
+
+  it('converts days to ms', () => {
+    expect(overdueDurationMs(2, 'days')).toBe(2 * 24 * 60 * 60 * 1000);
   });
 });
