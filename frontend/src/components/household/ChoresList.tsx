@@ -5,9 +5,10 @@ import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/
 import type { FilteredChore } from '../../utils/choreFilter';
 import { ChoreRow } from './ChoreRow';
 
-interface ChoresListProps {
-  chores: FilteredChore[];
-  allChoresCount: number;
+// Shared by ChoresList (group by chore) and ChoresByZoneList (group by zone), which
+// both ultimately render the same set of chore/zone handlers down to ChoreRow /
+// ChoreZoneSection.
+export interface ChoresListSharedProps {
   zoneNameById: Map<number, string>;
   members: HouseholdMember[];
   currentUserId: number;
@@ -29,6 +30,19 @@ interface ChoresListProps {
   selectedTargets: Set<string>;
   onToggleTarget: (choreId: number, zoneId: number | null) => void;
   onSetZoneGroupSelected: (choreId: number, zoneIds: number[], selected: boolean) => void;
+}
+
+interface ChoresListProps extends ChoresListSharedProps {
+  chores: FilteredChore[];
+  allChoresCount: number;
+}
+
+export function ChoresEmptyState({ allChoresCount }: { allChoresCount: number }) {
+  return (
+    <p className="chores-empty">
+      {allChoresCount === 0 ? 'No chores yet.' : 'No chores match this filter.'}
+    </p>
+  );
 }
 
 export function ChoresList({
@@ -57,11 +71,7 @@ export function ChoresList({
   onSetZoneGroupSelected,
 }: ChoresListProps) {
   if (chores.length === 0) {
-    return (
-      <p className="chores-empty">
-        {allChoresCount === 0 ? 'No chores yet.' : 'No chores match this filter.'}
-      </p>
-    );
+    return <ChoresEmptyState allChoresCount={allChoresCount} />;
   }
 
   return (

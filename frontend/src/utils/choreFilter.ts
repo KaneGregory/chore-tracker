@@ -1,5 +1,5 @@
 import type { Chore, ChoreFilter, ChoreStatus } from '../types/chore';
-import { worstChoreStatus } from './choreStatus';
+import { CHORE_STATUSES, worstChoreStatus } from './choreStatus';
 
 export interface FilteredChore {
   chore: Chore;
@@ -45,5 +45,39 @@ export function filterChores(
     }
   }
 
+  return result;
+}
+
+// A second, independent narrowing pass over filterChores's output — composes with
+// the assignee filter above by further shrinking visibleZoneIds, so a status-filtered
+// zone is hidden through the same mechanism an assignee-filtered zone already is.
+export function filterByStatus(
+  filtered: FilteredChore[],
+  statuses: ReadonlySet<ChoreStatus>,
+): FilteredChore[] {
+  if (statuses.size === CHORE_STATUSES.length) return filtered;
+
+  const result: FilteredChore[] = [];
+  for (const filteredChore of filtered) {
+    const { chore, visibleZoneIds } = filteredChore;
+
+    if (chore.zones.length === 0) {
+      if (statuses.has(chore.status)) result.push(filteredChore);
+      continue;
+    }
+
+    const candidateZones =
+      visibleZoneIds === null
+        ? chore.zones
+        : chore.zones.filter((zone) => visibleZoneIds.includes(zone.zoneId));
+    const matchedZones = candidateZones.filter((zone) => statuses.has(zone.status));
+    if (matchedZones.length === 0) continue;
+
+    result.push({
+      chore,
+      visibleZoneIds: matchedZones.map((zone) => zone.zoneId),
+      displayStatus: worstChoreStatus(matchedZones.map((zone) => zone.status)),
+    });
+  }
   return result;
 }
