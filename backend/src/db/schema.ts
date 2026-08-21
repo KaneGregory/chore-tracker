@@ -1,4 +1,14 @@
-import { sqliteTable, text, integer, unique, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
+import {
+  sqliteTable,
+  text,
+  integer,
+  unique,
+  uniqueIndex,
+  index,
+  check,
+  type AnySQLiteColumn,
+} from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 export const HOUSEHOLD_ROLES = ['member', 'head'] as const;
 export type HouseholdRole = (typeof HOUSEHOLD_ROLES)[number];
@@ -21,6 +31,11 @@ export const households = sqliteTable('households', {
     .notNull()
     .references((): AnySQLiteColumn => users.id),
   createdAt: integer('created_at').notNull(),
+  // IANA zone (e.g. "America/New_York"), captured client-side the same way
+  // push_subscriptions.timezone is — every chore_schedules row belonging to this
+  // household is evaluated against it (see choreScheduler.ts). Null until a member's
+  // browser has synced one; schedules fall back to UTC until then.
+  timezone: text('timezone'),
 });
 
 export const users = sqliteTable('users', {
@@ -82,6 +97,12 @@ export const chores = sqliteTable('chores', {
   // Only meaningful when the chore has no zones — a chore with zones takes its status
   // from them instead (see choreService.deriveChoreStatus).
   status: text('status', { enum: CHORE_STATUSES }).notNull().default('to-do'),
+  // Epoch ms, nullable: the instant this chore's status most recently changed
+  // *into* 'to-do' (including at creation, since a chore defaults to 'to-do') —
+  // never touched by a redundant 'to-do' -> 'to-do' write. Drives an overdue
+  // timer's `overdueAt` (see chore_schedules.overdueAt) when one is configured;
+  // otherwise unused. See choreService.ts for every write site.
+  todoSince: integer('todo_since'),
   createdAt: integer('created_at').notNull(),
 });
 
@@ -96,6 +117,9 @@ export const choreZones = sqliteTable(
       .notNull()
       .references(() => zones.id, { onDelete: 'cascade' }),
     status: text('status', { enum: CHORE_STATUSES }).notNull().default('to-do'),
+    // Same role as chores.todoSince, but for this specific zone-link — see that
+    // column's comment.
+    todoSince: integer('todo_since'),
   },
   (table) => [unique().on(table.choreId, table.zoneId)],
 );
@@ -110,6 +134,115 @@ export const choreAssignments = sqliteTable('chore_assignments', {
   userId: integer('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const RECURRENCE_TYPES = ['once', 'every_n_days', 'weekly', 'monthly'] as const;
+export type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
+
+export const OVERDUE_AFTER_UNITS = ['minutes', 'hours', 'days'] as const;
+export type OverdueAfterUnit = (typeof OVERDUE_AFTER_UNITS)[number];
+
+// Exactly one schedule per chore/chore-zone (see the two partial unique indexes
+// below) — setting a new one replaces the old rather than layering several. Exactly
+// one of choreId/choreZoneId is set (see the CHECK constraint), mirroring the same
+// zoned/zoneless split as chores.status vs. chore_zones.status: a schedule attaches
+// to the chore itself when it has no zones, or to one specific zone-link when it does
+// (see choreService.deriveChoreStatus).
+export const choreSchedules = sqliteTable(
+  'chore_schedules',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    choreId: integer('chore_id').references(() => chores.id, { onDelete: 'cascade' }),
+    choreZoneId: integer('chore_zone_id').references(() => choreZones.id, { onDelete: 'cascade' }),
+    recurrenceType: text('recurrence_type', { enum: RECURRENCE_TYPES }).notNull(),
+    // Epoch ms. The schedule's anchor instant: for 'once' it's simply when it fires;
+    // for a recurring type it's the first occurrence, and the source of truth for the
+    // time-of-day (and, for 'weekly', which week counts as "week zero" — see
+    // scheduleTime.ts) every later occurrence reuses.
+    startAt: integer('start_at').notNull(),
+    intervalDays: integer('interval_days'),
+    intervalWeeks: integer('interval_weeks'),
+    // JSON-encoded array of 0 (Sunday)-6 (Saturday). Stored as text rather than a
+    // child table since it's small, read-mostly, and never queried by individual day.
+    weekdays: text('weekdays'),
+    intervalMonths: integer('interval_months'),
+    // Derived once from startAt's local day-of-month at creation, not re-derived from
+    // the previous occurrence — so "the 31st of every month" keeps aiming for the 31st
+    // even after a shorter month clamps one occurrence down (see scheduleTime.ts's
+    // monthly step).
+    dayOfMonth: integer('day_of_month'),
+    // The configured overdue timer, if any: both null together (no timer) or both
+    // set together (never enforced by a DB CHECK — see the plan's Global
+    // Constraints for why; both are always written together by
+    // scheduleService.insertSchedule).
+    overdueAfterAmount: integer('overdue_after_amount'),
+    overdueAfterUnit: text('overdue_after_unit', { enum: OVERDUE_AFTER_UNITS }),
+    // Epoch ms, nullable, indexed: precomputed "check at" instant for the overdue
+    // timer, mirroring nextRunAt's role for the reopen schedule — recomputed
+    // whenever the target's todoSince changes (see choreService.ts /
+    // scheduleService.refreshOverdueAtForTarget) or a new schedule with a timer is
+    // saved. Cleared to null once choreScheduler.ts's overdue poll has checked it,
+    // whether or not it actually fired — this is a one-shot deadline, not a
+    // repeating cadence like nextRunAt.
+    overdueAt: integer('overdue_at'),
+    // Epoch ms, indexed: the next time choreScheduler.ts should act on this schedule.
+    // Null means done — a fired 'once' schedule.
+    nextRunAt: integer('next_run_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('chore_schedules_chore_id_unique')
+      .on(table.choreId)
+      .where(sql`${table.choreId} IS NOT NULL`),
+    uniqueIndex('chore_schedules_chore_zone_id_unique')
+      .on(table.choreZoneId)
+      .where(sql`${table.choreZoneId} IS NOT NULL`),
+    index('chore_schedules_next_run_at_idx').on(table.nextRunAt),
+    index('chore_schedules_overdue_at_idx').on(table.overdueAt),
+    check(
+      'chore_schedules_exactly_one_target',
+      sql`(${table.choreId} IS NULL) != (${table.choreZoneId} IS NULL)`,
+    ),
+  ],
+);
+
+export const SCHEDULE_TEMPLATE_RECURRENCE_TYPES = ['every_n_days', 'weekly', 'monthly'] as const;
+export type ScheduleTemplateRecurrenceType = (typeof SCHEDULE_TEMPLATE_RECURRENCE_TYPES)[number];
+
+// Household-scoped, reusable recurrence shapes a head can apply to a chore/zone's
+// schedule via a picker (see scheduleTemplateService.ts) — snapshot semantics:
+// applying one just pre-fills the schedule form. There is no FK from chore_schedules
+// back here, so editing/deleting a schedule template never touches a schedule that
+// already used it. Deliberately excludes 'once' from its own recurrence-type enum
+// (rather than reusing RECURRENCE_TYPES) — a one-off date isn't reusable as a named
+// template. No startAt/target/nextRunAt like chore_schedules — a schedule template is
+// never itself evaluated by choreScheduler.ts, so startTime is plain 'HH:MM' text
+// rather than an epoch instant, and monthly's dayOfMonth is a first-class input here
+// (unlike chore_schedules, which derives it from startDate — a schedule template has
+// no date to derive it from). The underlying table name (`schedule_patterns`,
+// migration `0014`) predates this identifier's rename and was left as-is — renaming a
+// SQL table needs its own migration, and the exported binding name here is all that
+// actually needs to track the concept's current name.
+export const scheduleTemplates = sqliteTable('schedule_patterns', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  householdId: integer('household_id')
+    .notNull()
+    .references(() => households.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  recurrenceType: text('recurrence_type', { enum: SCHEDULE_TEMPLATE_RECURRENCE_TYPES }).notNull(),
+  startTime: text('start_time').notNull(),
+  intervalDays: integer('interval_days'),
+  intervalWeeks: integer('interval_weeks'),
+  weekdays: text('weekdays'),
+  intervalMonths: integer('interval_months'),
+  dayOfMonth: integer('day_of_month'),
+  // Same shape as chore_schedules' overdueAfterAmount/overdueAfterUnit — applying
+  // this template pre-fills the overdue timer along with the recurrence shape.
+  // No overdueAt here: a template is never itself evaluated by the scheduler,
+  // same reasoning already applied to it having no startAt/nextRunAt.
+  overdueAfterAmount: integer('overdue_after_amount'),
+  overdueAfterUnit: text('overdue_after_unit', { enum: OVERDUE_AFTER_UNITS }),
   createdAt: integer('created_at').notNull(),
 });
 

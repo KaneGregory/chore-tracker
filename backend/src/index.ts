@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { runMigrations } from './db/client.js';
 import { createApp } from './app.js';
 import { startDailyReminderScheduler } from './services/dailyReminderScheduler.js';
+import { startChoreScheduler } from './services/choreScheduler.js';
 
 runMigrations();
 
@@ -16,3 +17,7 @@ app.listen(port, () => {
 // interval (leaked across tests, checking chores against whatever tmp db happens to
 // exist at that moment).
 startDailyReminderScheduler();
+
+// Same reasoning as startDailyReminderScheduler above: started here, not in
+// createApp(), so no test spins up a real recurring interval.
+startChoreScheduler();

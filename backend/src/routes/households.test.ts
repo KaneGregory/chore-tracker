@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 
 const testDir = mkdtempSync(join(tmpdir(), 'chore-tracker-households-routes-'));
@@ -9,7 +10,8 @@ process.env.DB_FILE = join(testDir, 'test.db');
 process.env.SESSION_TTL_DAYS = '30';
 process.env.CORS_ORIGIN = 'http://localhost:5173';
 
-const { runMigrations, sqlite } = await import('../db/client.js');
+const { runMigrations, sqlite, db } = await import('../db/client.js');
+const { households } = await import('../db/schema.js');
 const { createApp } = await import('../app.js');
 
 runMigrations();
@@ -674,5 +676,67 @@ describe('POST /api/households', () => {
       .send({ mode: 'create', name: 'Nope House' });
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe('PATCH /api/households/:householdId/timezone', () => {
+  it('lets any active member set the household timezone', async () => {
+    const head = await registerHeadOfHousehold('tz-hoh@example.com', 'Timezone House');
+    const member = await registerAndJoin('tz-member@example.com', head);
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', member.cookie)
+      .send({ timezone: 'America/New_York' });
+
+    expect(response.status).toBe(204);
+  });
+
+  it('rejects an invalid timezone name', async () => {
+    const head = await registerHeadOfHousehold('tz-invalid-hoh@example.com', 'Invalid TZ House');
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', head.cookie)
+      .send({ timezone: 'Not/AZone' });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a non-member with a generic 404', async () => {
+    const head = await registerHeadOfHousehold('tz-outsider-hoh@example.com', 'Outsider TZ House');
+    const outsider = await registerHeadOfHousehold('tz-outsider@example.com', 'Outsider TZ House 2');
+
+    const response = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', outsider.cookie)
+      .send({ timezone: 'UTC' });
+
+    expect(response.status).toBe(404);
+  });
+
+  it('first-sync-wins: a second sync with a different timezone does not change an already-set one', async () => {
+    const head = await registerHeadOfHousehold('tz-firstsync-hoh@example.com', 'First Sync House');
+    const member = await registerAndJoin('tz-firstsync-member@example.com', head);
+
+    const first = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', head.cookie)
+      .send({ timezone: 'America/New_York' });
+    expect(first.status).toBe(204);
+
+    // There's no GET endpoint exposing households.timezone, so assert directly
+    // against the DB, same pattern dailyReminderScheduler.test.ts uses.
+    const afterFirst = db.select({ timezone: households.timezone }).from(households).where(eq(households.id, head.householdId)).get();
+    expect(afterFirst?.timezone).toBe('America/New_York');
+
+    const second = await request(app)
+      .patch(`/api/households/${head.householdId}/timezone`)
+      .set('Cookie', member.cookie)
+      .send({ timezone: 'Pacific/Auckland' });
+    expect(second.status).toBe(204);
+
+    const afterSecond = db.select({ timezone: households.timezone }).from(households).where(eq(households.id, head.householdId)).get();
+    expect(afterSecond?.timezone).toBe('America/New_York');
   });
 });

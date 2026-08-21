@@ -49,11 +49,7 @@ export function HomePage() {
           )}
         </div>
         {primaryHousehold?.role === 'head' && (
-          <Link
-            to={`/households/${primaryHousehold.id}/chores/new`}
-            className="btn-fab"
-            aria-label="Add chore"
-          >
+          <Link to="/chores/new" className="btn-fab" aria-label="Add chore">
             +
           </Link>
         )}

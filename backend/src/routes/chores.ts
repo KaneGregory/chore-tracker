@@ -10,7 +10,9 @@ import {
   createChoreSchema,
   setChoreStatusSchema,
 } from '../validation/choreSchemas.js';
+import { setScheduleSchema } from '../validation/scheduleSchemas.js';
 import * as choreService from '../services/choreService.js';
+import * as scheduleService from '../services/scheduleService.js';
 
 export const choresRouter = Router();
 
@@ -185,6 +187,119 @@ choresRouter.patch('/:householdId/chores/:choreId/zones/:zoneId/status', (req, r
       bodyParsed.data.status,
     );
     res.status(200).json({ chore });
+  } catch (err) {
+    next(err);
+  }
+});
+
+choresRouter.get('/:householdId/chores/schedules', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const parsed = householdParamsSchema.safeParse(req.params);
+  if (!parsed.success) {
+    next(new ValidationError('Invalid household id', parsed.error.issues));
+    return;
+  }
+
+  try {
+    const schedules = scheduleService.listSchedulesForHousehold(parsed.data.householdId, req.user.id);
+    res.status(200).json({ schedules });
+  } catch (err) {
+    next(err);
+  }
+});
+
+choresRouter.put('/:householdId/chores/:choreId/schedule', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = choreParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid household or chore id', paramsParsed.error.issues));
+    return;
+  }
+
+  const bodyParsed = setScheduleSchema.safeParse(req.body);
+  if (!bodyParsed.success) {
+    next(new ValidationError('Invalid schedule', bodyParsed.error.issues));
+    return;
+  }
+
+  try {
+    const schedule = scheduleService.setScheduleForChore(
+      paramsParsed.data.householdId,
+      paramsParsed.data.choreId,
+      req.user.id,
+      bodyParsed.data,
+    );
+    res.status(200).json({ schedule });
+  } catch (err) {
+    next(err);
+  }
+});
+
+choresRouter.delete('/:householdId/chores/:choreId/schedule', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = choreParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid household or chore id', paramsParsed.error.issues));
+    return;
+  }
+
+  try {
+    scheduleService.removeScheduleForChore(paramsParsed.data.householdId, paramsParsed.data.choreId, req.user.id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+choresRouter.put('/:householdId/chores/:choreId/zones/:zoneId/schedule', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = choreZoneParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid ids', paramsParsed.error.issues));
+    return;
+  }
+
+  const bodyParsed = setScheduleSchema.safeParse(req.body);
+  if (!bodyParsed.success) {
+    next(new ValidationError('Invalid schedule', bodyParsed.error.issues));
+    return;
+  }
+
+  try {
+    const schedule = scheduleService.setScheduleForChoreZone(
+      paramsParsed.data.householdId,
+      paramsParsed.data.choreId,
+      paramsParsed.data.zoneId,
+      req.user.id,
+      bodyParsed.data,
+    );
+    res.status(200).json({ schedule });
+  } catch (err) {
+    next(err);
+  }
+});
+
+choresRouter.delete('/:householdId/chores/:choreId/zones/:zoneId/schedule', (req, res, next) => {
+  if (!req.user) throw new NotAuthenticatedError();
+
+  const paramsParsed = choreZoneParamsSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    next(new ValidationError('Invalid ids', paramsParsed.error.issues));
+    return;
+  }
+
+  try {
+    scheduleService.removeScheduleForChoreZone(
+      paramsParsed.data.householdId,
+      paramsParsed.data.choreId,
+      paramsParsed.data.zoneId,
+      req.user.id,
+    );
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

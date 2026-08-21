@@ -92,6 +92,27 @@
       "when": 1786470816903,
       "tag": "0012_perpetual_microchip",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1786658928072,
+      "tag": "0013_blue_proudstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1786732898417,
+      "tag": "0014_bored_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1787263499492,
+      "tag": "0015_unknown_annihilus",
+      "breakpoints": true
     }
   ]
 }

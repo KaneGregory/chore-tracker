@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { usernameSchema } from './authSchemas.js';
+import { timeZoneSchema } from './timeZoneSchema.js';
 
 export const idParam = z.coerce.number().int().positive();
 
@@ -19,4 +20,8 @@ export const createMemberSchema = z.object({
 
 export const assignPendingMemberSchema = z.object({
   targetMemberId: idParam,
+});
+
+export const setHouseholdTimezoneSchema = z.object({
+  timezone: timeZoneSchema,
 });

@@ -377,6 +377,111 @@ you don't recognize, stop and ask the user rather than guessing whose it is.
   `3px 10px`, so the bigger text doesn't look cramped in the pill) — if a future
   display-face swap goes back to a geometric/sans-serif face, reconsider all of these
   bumps too, they were tuned for Caveat specifically.
+* Households have a nullable `timezone` (IANA string, e.g. `"America/New_York"`) used
+  to evaluate chore schedules (below) — captured automatically from a member's browser
+  via `Intl.DateTimeFormat().resolvedOptions().timeZone` on every page load
+  (`HouseholdCard.tsx`'s timezone-sync effect, `PATCH /api/households/:householdId/timezone`,
+  `householdService.setTimezone`), but only written the *first* time (first-sync-wins):
+  once a household has a timezone, subsequent syncs from any member's browser are
+  no-ops. This is deliberate — the endpoint is intentionally not head-restricted (any
+  active member's browser can report what it thinks local time is, same as
+  `push_subscriptions.timezone`), but a household's chore schedules are anchored to a
+  single stored instant (see below), so letting every page load silently overwrite the
+  timezone would re-anchor a household's recurring schedules to whichever member most
+  recently opened the app — shifting when chores actually fire, and (for `weekly`
+  schedules specifically) potentially shifting which day of the week an occurrence
+  lands on if the tz change crosses local midnight. There's still no UI for a head to
+  explicitly change an already-set timezone (e.g. after a household genuinely moves) —
+  known gap, see below.
+* Chores (and, separately, each `chore_zones` link) can carry a schedule
+  (`chore_schedules` table, migration `0013`) that automatically flips status back to
+  `to-do` without a human clicking anything — the first phase of a larger "scheduling"
+  feature; a second phase (a `to-do` → `overdue` rule, the "overdue timer") is now
+  also built, see
+  `docs/superpowers/specs/2026-08-13-scheduling-design.md` and
+  `docs/superpowers/plans/2026-08-13-scheduling-phase1.md` for phase 1, and the
+  overdue-timer bullet below for phase 2. A schedule is exactly one
+  of four types (`'once' | 'every_n_days' | 'weekly' | 'monthly'`), targets either a
+  whole zoneless chore or one specific `chore_zones` link (mirroring the same
+  zoned/zoneless split `chores.status`/`chore_zones.status` already use), and there's
+  at most one schedule per target (enforced by two partial unique indexes on
+  `chore_id`/`chore_zone_id` where not null, plus a `CHECK` that exactly one of the two
+  is set) — setting a new one replaces the old rather than layering several.
+  `backend/src/services/scheduleTime.ts` is a pure, DB-free module (no date library —
+  hand-rolled with `Intl.DateTimeFormat`, following the same technique
+  `dailyReminderScheduler.ts` already used for the daily reminder) that converts
+  between an instant and local wall-clock components in an arbitrary IANA zone, and
+  computes how each recurrence type advances; `weekly`'s "every N weeks" cadence is
+  always measured relative to the schedule's own fixed `startAt` anchor, never the
+  previous occurrence being stepped from — anchoring to the previous occurrence
+  instead looks almost identical but silently breaks as soon as `intervalWeeks > 1`
+  and more than one weekday is selected. `backend/src/services/choreScheduler.ts`
+  polls every 60 seconds (same interval and `setInterval`-handle pattern as
+  `dailyReminderScheduler.ts`, started only from `index.ts`, never `createApp()`) and,
+  for each due schedule, flips status via `choreService.systemReopenChore`/
+  `systemReopenChoreZone` — internal, route-free functions (same precedent as
+  `userHasIncompleteAssignedChores`) that flip `'complete'` → `'to-do'` **only**;
+  an `'overdue'` chore/zone is deliberately left untouched (a missed cycle stays
+  visibly overdue rather than being silently cleared by the next occurrence), and an
+  already-`'to-do'` one is a no-op either way. Every per-row scheduler failure
+  (a malformed `chore_schedules` row, a since-deleted target, an unrecognized stored
+  timezone) is caught individually and that one row is disabled (`next_run_at` set to
+  `null`) rather than being allowed to crash the whole poll pass or the process — this
+  regressed once already during review: an early version let one bad row's exception
+  propagate out of `checkSchedules()` and out of the `setInterval` callback entirely.
+  `advanceUntilFuture`'s catch-up loop (for a schedule that missed several cycles,
+  e.g. the server was down) is capped at `MAX_CATCHUP_STEPS` for the same reason — an
+  uncapped loop is both a crash risk (a corrupted row with a null interval never
+  advances and loops forever) and, before `scheduleSchemas.ts`'s `startDate` gained a
+  sane year range, a real request-time DoS (a schedule started in year `0001` took
+  tens of seconds of fully-blocked single-threaded event loop to catch up). Schedules
+  are surfaced to the frontend via a separate `GET
+  /api/households/:householdId/chores/schedules` list (all of a household's schedules
+  in one response, tagged with their `choreId`/`zoneId`) rather than attached to the
+  existing chore/zone read payload — a deliberate deviation from the original design
+  spec, decided during planning specifically to avoid touching `choreService.ts`'s
+  `attachDetails`/`ChoreSummary` and rewriting the existing exact-shape `toEqual`
+  assertions in `routes/chores.test.ts` for no behavioral difference to the user.
+* Phase 2 of scheduling ("overdue timer", migration `0015`, see
+  `docs/superpowers/specs/2026-08-20-overdue-timer-design.md` and
+  `docs/superpowers/plans/2026-08-20-overdue-timer-phase2.md`) lets a schedule also
+  carry an optional amount+unit duration (`chore_schedules.overdueAfterAmount`/
+  `overdueAfterUnit`, minutes/hours/days) after which a still-`'to-do'` target
+  automatically flips to `'overdue'`. It's built on two new nullable `todoSince`
+  columns (`chores.todoSince`/`choreZones.todoSince`, epoch ms) tracking "when did
+  this most recently become `'to-do'`" — written in every status-mutation path in
+  `choreService.ts` (`setChoreStatus`, `setChoreZoneStatus`, `systemReopenChore`,
+  `systemReopenChoreZone`, and `createChore` at creation time), and only on a *real*
+  transition into `'to-do'` from some other status, never a redundant
+  `'to-do'` → `'to-do'` write — the same distinction `notificationBatcher.ts` already
+  draws for reopen notifications. `chore_schedules.overdueAt` (epoch ms, nullable,
+  indexed) is the precomputed "check at" instant the timer actually fires against,
+  populated by `scheduleService.ts`'s `insertSchedule` (when a schedule with a timer
+  is created/replaced against a target that's currently `'to-do'`) and by its
+  `refreshOverdueAtForTarget` (called from every one of `choreService.ts`'s
+  to-do-transition sites above, whenever that specific call actually changed
+  `todoSince`) — unlike `nextRunAt`'s repeating cadence, `overdueAt` is strictly
+  one-shot: `choreScheduler.ts`'s `checkOverdueSchedules` (same 60-second
+  `setInterval` `checkSchedules` already polls on, not a second timer) clears it back
+  to `null` unconditionally once checked, whether the target was actually flipped
+  (via the new `choreService.systemMarkOverdue`/`systemMarkOverdueZone`, mirroring
+  `systemReopenChore`/`systemReopenChoreZone` and reusing the same
+  `queueOverdueNotification` path a head's manual "Mark overdue" already triggers) or
+  found to already be `'complete'`/`'overdue'` by the time the poll ran — it only gets
+  a next value the following time the target genuinely re-enters `'to-do'`.
+  `overdueAfterAmount`/`overdueAfterUnit` are nullable with no DB-level `CHECK` tying
+  their co-nullability together (unlike `chore_schedules`' existing exactly-one-target
+  `CHECK`) — a deliberate omission: both columns are only ever written together, by
+  exactly one code path each (`scheduleService.insertSchedule` and
+  `scheduleTemplateService.createScheduleTemplate`), already guaranteed paired by Zod
+  (`overdueAfterSchema`, `scheduleSchemas.ts`) before either function runs, so a
+  `CHECK` would only add the risk of a table-recreating migration (per the
+  migration-safety note above) for an invariant that's already fully controlled by
+  its single writer. `schedule_patterns` (schedule templates) carries the same
+  `overdueAfterAmount`/`overdueAfterUnit` pair with the same snapshot semantics as
+  every other field it already carries — applying a template pre-fills the timer
+  along with the recurrence shape, and (like `nextRunAt`) it has no `overdueAt` of its
+  own, since a template is never itself evaluated by the scheduler.
 
 ## All code should be
 
@@ -462,6 +567,36 @@ Run from within `backend/` or `frontend/` unless noted:
   household or user yet. Real-device (Android/iOS) push testing requires HTTPS (the
   Push API treats `localhost` as secure but nothing else non-HTTPS) — not set up,
   same deferred status as installing the PWA on a real phone.
+* Chore scheduling (phase 1) has no UI to see or change a household's timezone once
+  it's been auto-captured (first-sync-wins, see the timezone bullet in "Architectural
+  decisions") — if a household genuinely relocates, there's currently no way to update
+  it. A one-off (`'once'`) schedule whose start date has already passed when created
+  is silently inert (`nextRunAt` is `null` from the start) with no indication in the UI
+  that it will never fire — it just sits there looking like a normal schedule. The
+  frontend fetches all of a household's schedules once per page load and never
+  refetches, so a schedule's displayed `nextRunAt` (not currently rendered in the UI at
+  all, though the data is fetched) can go stale between chore-list refreshes. There's
+  no way for a head to add a schedule to a chore at creation time — only after the
+  chore already exists, via each chore/zone's own "Add schedule" control. Phase 2 (the
+  `to-do` → `overdue` rule, the overdue timer) is now built — see the overdue-timer
+  bullet in "Architectural decisions" and
+  `docs/superpowers/specs/2026-08-20-overdue-timer-design.md`.
+* The overdue-timer's amount input (`ChoreScheduleForm.tsx`/`ScheduleTemplateForm.tsx`)
+  has no client-side clamping beyond the plain HTML `min`/`max` on the number input —
+  an out-of-range or non-integer value is either silently treated as "no timer"
+  (`buildOverdueAfter`'s validation) or rejected outright by the backend's existing
+  400 response (`scheduleSchemas.ts`'s `overdueAfterSchema`), with no friendlier
+  inline validation message shown either way.
+* The automatic `'to-do'` → `'overdue'` flip is invisible in the UI until the page is
+  reloaded — there's no live refetch/polling on the frontend (consistent with
+  `nextRunAt` never being live-rendered either), so a background flip from
+  `choreScheduler.ts`'s poll only becomes visible on the next load. Assignees still
+  get a push notification at the moment it fires, via the same
+  `queueOverdueNotification` path a head's manual "Mark overdue" already uses.
+* Once a chore/zone is `'overdue'`, it stays `'overdue'` until someone manually
+  completes or reopens it — the overdue timer only re-arms on a genuine transition
+  back into `'to-do'` (see `refreshOverdueAtForTarget`), it does not re-fire on its
+  own while sitting `'overdue'`.
 
 Fixed during the UI pass: the household's join code was generated and stored but
 never returned by the API, so there was no way to actually invite anyone into a

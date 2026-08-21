@@ -84,3 +84,10 @@ export async function createOrJoinHousehold(choice: HouseholdChoice): Promise<Ho
   });
   return response.household;
 }
+
+export async function syncTimezone(householdId: number, timezone: string): Promise<void> {
+  await apiRequest<void>(`/api/households/${householdId}/timezone`, {
+    method: 'PATCH',
+    body: JSON.stringify({ timezone }),
+  });
+}

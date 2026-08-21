@@ -62,7 +62,59 @@ body {
 #root {
   max-width: 480px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px 16px calc(16px + var(--bulk-bar-height, 0px));
+  transition: padding-bottom 150ms ease;
+}
+
+/* ---------- modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--paper);
+  overflow-y: auto;
+  padding: 20px 16px;
+}
+
+.modal-content {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-title {
+  margin: 0;
+}
+
+.modal-close-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  background: color-mix(in srgb, var(--error) 18%, var(--card));
+  color: var(--error);
 }
 
 h1,
@@ -776,6 +828,12 @@ fieldset.form-field legend,
   color: var(--error);
 }
 
+.chore-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .chore-row-main {
   display: flex;
   align-items: center;
@@ -867,11 +925,18 @@ fieldset.form-field legend,
   border-color: color-mix(in srgb, var(--error) 50%, var(--line));
 }
 
+.chore-zone-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .chore-zone-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: none;
   background: none;
   font: inherit;
@@ -959,6 +1024,11 @@ fieldset.form-field legend,
   flex-wrap: wrap;
 }
 
+.assignment-chips-empty {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .assignee-chip {
   display: inline-flex;
   align-items: center;
@@ -1038,4 +1108,177 @@ fieldset.form-field legend,
   background: var(--card);
   color: var(--ink);
   max-width: 150px;
+}
+
+/* ---------- chore scheduling ---------- */
+
+.chore-schedule-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chore-schedule-summary {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.chore-schedule-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-2) 20%, transparent);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.chore-schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.schedule-replace-warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--tape) 35%, transparent);
+  border: 2px solid var(--tape);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.schedule-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.schedule-field select,
+.schedule-field input {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
+
+.overdue-after-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.overdue-after-inputs input {
+  flex: 1;
+  min-width: 0;
+}
+
+.weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.weekday-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 4px 8px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.schedule-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.schedule-save-as-template {
+  gap: 6px;
+}
+
+.schedule-save-as-template span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.schedule-save-as-template input[type='text'] {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+
+.chore-schedule-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.chore-select-checkbox {
+  display: inline-flex;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.bulk-schedule-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(480px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--card);
+  border-top: 2px solid var(--line);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  box-shadow: 0 -10px 24px -8px color-mix(in srgb, var(--ink) 25%, transparent);
+  z-index: 20;
+}
+
+.bulk-schedule-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bulk-schedule-result {
+  font-size: 0.85rem;
+  color: var(--accent-2);
 }

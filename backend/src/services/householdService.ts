@@ -193,6 +193,23 @@ export function declineMember(
   return listMembers(householdId);
 }
 
+export function setTimezone(householdId: number, requestingUserId: number, timezone: string): void {
+  requireMembership(householdId, requestingUserId);
+
+  // First-sync-wins: once a household has a timezone, later syncs from any member's
+  // browser (e.g. someone traveling) must not silently re-anchor every existing
+  // schedule's firing time — see the incident this fixed. There's still no UI for a
+  // head to explicitly change an already-set timezone.
+  const household = db
+    .select({ timezone: households.timezone })
+    .from(households)
+    .where(eq(households.id, householdId))
+    .get();
+  if (household?.timezone) return;
+
+  db.update(households).set({ timezone }).where(eq(households.id, householdId)).run();
+}
+
 // "Assigning" a pending applicant to an existing account-less member (see
 // createMember) means they're the same real person: a head added a placeholder for
 // someone before that person had their own login, and now that person has joined for

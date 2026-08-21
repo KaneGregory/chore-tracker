@@ -20,6 +20,7 @@ import {
   queueOverdueNotification,
   queueReopenedNotification,
 } from './notificationBatcher.js';
+import { refreshOverdueAtForTarget } from './scheduleService.js';
 
 export interface ChoreAssignmentSummary {
   id: number;
@@ -71,13 +72,13 @@ type QueueNotificationFn = (
 // Assignees to notify on a chore/zone status change: anyone assigned directly to
 // that zone, plus anyone assigned to the whole chore (zoneId IS NULL applies across
 // all of its zones) — same "whole chore vs. one zone" split the schema documents for
-// choreAssignments.zoneId. Never queues for requestingUserId — a user is never
-// notified about a change they made themselves.
+// choreAssignments.zoneId. Never queues for requestingUserId (when there is one) — a
+// user is never notified about a change they made themselves.
 function notifyAssignees(
   choreId: number,
   zoneId: number | null,
   choreName: string,
-  requestingUserId: number,
+  requestingUserId: number | null,
   queueFn: QueueNotificationFn,
 ): void {
   const assignments = db
@@ -94,7 +95,9 @@ function notifyAssignees(
     .all();
 
   const userIds = new Set(assignments.map((row) => row.userId));
-  userIds.delete(requestingUserId);
+  // null means a system-triggered change (see systemReopenChore/systemReopenChoreZone)
+  // — there's no acting human to exclude, so every assignee gets notified.
+  if (requestingUserId !== null) userIds.delete(requestingUserId);
   for (const userId of userIds) {
     queueFn(userId, choreId, zoneId, choreName);
   }
@@ -230,13 +233,13 @@ export function createChore(
   const chore = db.transaction((tx) => {
     const inserted = tx
       .insert(chores)
-      .values({ householdId, name, createdAt: now })
+      .values({ householdId, name, todoSince: now, createdAt: now })
       .returning()
       .get();
 
     if (uniqueZoneIds.length > 0) {
       tx.insert(choreZones)
-        .values(uniqueZoneIds.map((zoneId) => ({ choreId: inserted.id, zoneId })))
+        .values(uniqueZoneIds.map((zoneId) => ({ choreId: inserted.id, zoneId, todoSince: now })))
         .run();
     }
 
@@ -381,7 +384,13 @@ export function setChoreStatus(
   if (anyZoneLink) throw new ChoreStatusManagedByZonesError();
 
   const previousStatus = chore.status;
-  db.update(chores).set({ status }).where(eq(chores.id, choreId)).run();
+  const becomingToDo = status === 'to-do' && previousStatus !== 'to-do';
+  const now = Date.now();
+  db.update(chores)
+    .set(becomingToDo ? { status, todoSince: now } : { status })
+    .where(eq(chores.id, choreId))
+    .run();
+  if (becomingToDo) refreshOverdueAtForTarget(choreId, null, now);
 
   if (status === 'overdue') {
     notifyAssignees(choreId, null, chore.name, requestingUserId, queueOverdueNotification);
@@ -412,7 +421,13 @@ export function setChoreZoneStatus(
     .get();
   if (!link) throw new ChoreZoneMismatchError();
 
-  db.update(choreZones).set({ status }).where(eq(choreZones.id, link.id)).run();
+  const becomingToDo = status === 'to-do' && link.status !== 'to-do';
+  const now = Date.now();
+  db.update(choreZones)
+    .set(becomingToDo ? { status, todoSince: now } : { status })
+    .where(eq(choreZones.id, link.id))
+    .run();
+  if (becomingToDo) refreshOverdueAtForTarget(choreId, zoneId, now);
 
   if (status === 'overdue') {
     notifyAssignees(choreId, zoneId, chore.name, requestingUserId, queueOverdueNotification);
@@ -421,4 +436,75 @@ export function setChoreZoneStatus(
   }
 
   return attachDetailsToOne(chore);
+}
+
+// Internal system mutation for choreScheduler.ts — flips a zoneless chore's status
+// from 'complete' back to 'to-do' when its schedule fires, skipping the
+// requireMembership/role checks every user-facing status change goes through, since
+// there's no requesting user, only "this schedule says it's time." No-ops (returns
+// false) if the chore isn't currently 'complete' — an 'overdue' chore is deliberately
+// left alone so a missed cycle stays visible rather than being silently cleared, and
+// an already-'to-do' chore has nothing to do.
+export function systemReopenChore(choreId: number): boolean {
+  const chore = db.select(CHORE_ROW_COLUMNS).from(chores).where(eq(chores.id, choreId)).get();
+  if (!chore || chore.status !== 'complete') return false;
+
+  const now = Date.now();
+  db.update(chores).set({ status: 'to-do', todoSince: now }).where(eq(chores.id, choreId)).run();
+  refreshOverdueAtForTarget(choreId, null, now);
+  notifyAssignees(choreId, null, chore.name, null, queueReopenedNotification);
+  return true;
+}
+
+// Same as systemReopenChore, but for one zone-link of a chore.
+export function systemReopenChoreZone(choreId: number, zoneId: number): boolean {
+  const chore = db.select(CHORE_ROW_COLUMNS).from(chores).where(eq(chores.id, choreId)).get();
+  if (!chore) return false;
+
+  const link = db
+    .select({ id: choreZones.id, status: choreZones.status })
+    .from(choreZones)
+    .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
+    .get();
+  if (!link || link.status !== 'complete') return false;
+
+  const now = Date.now();
+  db.update(choreZones).set({ status: 'to-do', todoSince: now }).where(eq(choreZones.id, link.id)).run();
+  refreshOverdueAtForTarget(choreId, zoneId, now);
+  notifyAssignees(choreId, zoneId, chore.name, null, queueReopenedNotification);
+  return true;
+}
+
+// Internal system mutation for choreScheduler.ts's overdue poll — flips a zoneless
+// chore's status from 'to-do' to 'overdue' when its overdue timer has elapsed,
+// skipping the requireMembership/head-only role check every user-facing overdue
+// transition goes through, since there's no requesting user. No-ops (returns
+// false) if the chore isn't currently 'to-do' — it may have been completed in
+// time, or already overdue via another path. Reuses the exact same
+// queueOverdueNotification path the manual "Mark overdue" action already uses, so
+// assignees are notified the same way either way.
+export function systemMarkOverdue(choreId: number): boolean {
+  const chore = db.select(CHORE_ROW_COLUMNS).from(chores).where(eq(chores.id, choreId)).get();
+  if (!chore || chore.status !== 'to-do') return false;
+
+  db.update(chores).set({ status: 'overdue' }).where(eq(chores.id, choreId)).run();
+  notifyAssignees(choreId, null, chore.name, null, queueOverdueNotification);
+  return true;
+}
+
+// Same as systemMarkOverdue, but for one zone-link of a chore.
+export function systemMarkOverdueZone(choreId: number, zoneId: number): boolean {
+  const chore = db.select(CHORE_ROW_COLUMNS).from(chores).where(eq(chores.id, choreId)).get();
+  if (!chore) return false;
+
+  const link = db
+    .select({ id: choreZones.id, status: choreZones.status })
+    .from(choreZones)
+    .where(and(eq(choreZones.choreId, choreId), eq(choreZones.zoneId, zoneId)))
+    .get();
+  if (!link || link.status !== 'to-do') return false;
+
+  db.update(choreZones).set({ status: 'overdue' }).where(eq(choreZones.id, link.id)).run();
+  notifyAssignees(choreId, zoneId, chore.name, null, queueOverdueNotification);
+  return true;
 }

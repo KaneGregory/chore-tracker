@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { timeZoneSchema } from './timeZoneSchema.js';
 
 // A subscription's endpoint is where notifyUser (pushService.ts) later sends a real
 // outbound HTTP request, on a trigger an ordinary household member can pull
@@ -35,19 +36,6 @@ const pushEndpointSchema = z
   .string()
   .url()
   .refine(isPublicHttpsUrl, 'Push endpoint must be a public https:// URL');
-
-function isValidIanaTimeZone(value: string): boolean {
-  try {
-    // Throws RangeError for anything that isn't a real IANA zone name — the
-    // standard way to validate one without hardcoding/maintaining a zone list.
-    new Intl.DateTimeFormat(undefined, { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const timeZoneSchema = z.string().min(1).refine(isValidIanaTimeZone, 'Invalid time zone');
 
 export const pushSubscriptionSchema = z.object({
   endpoint: pushEndpointSchema,

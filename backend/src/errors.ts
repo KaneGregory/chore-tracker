@@ -157,3 +157,19 @@ export class ChoreStatusManagedByZonesError extends AppError {
     );
   }
 }
+
+export class ChoreScheduleManagedByZonesError extends AppError {
+  constructor() {
+    super(
+      400,
+      'ChoreScheduleManagedByZones',
+      'This chore has zones — set a schedule on each zone individually',
+    );
+  }
+}
+
+export class ScheduleTemplateNotFoundError extends AppError {
+  constructor() {
+    super(404, 'ScheduleTemplateNotFound', 'That schedule template was not found');
+  }
+}
