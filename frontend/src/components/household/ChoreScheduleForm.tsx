@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { OverdueAfterUnit, RecurrenceType, Schedule, ScheduleInput } from '../../types/schedule';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 import { FormField } from '../common/FormField';
+import { buildOverdueAfter, OverdueAfterField } from '../common/OverdueAfterField';
 import { suggestStartDate } from '../../utils/suggestStartDate';
 
 interface ChoreScheduleFormProps {
@@ -59,17 +60,6 @@ export function ChoreScheduleForm({
     });
   }
 
-  // Empty amount means "no timer" — mirrors how the rest of this form already
-  // treats an empty field as not-configured (see buildScheduleInput's `!startDate`
-  // early return).
-  function buildOverdueAfter(): { amount: number; unit: OverdueAfterUnit } | undefined {
-    const trimmed = overdueAfterAmount.trim();
-    if (!trimmed) return undefined;
-    const amount = Number(trimmed);
-    if (!Number.isInteger(amount) || amount < 1) return undefined;
-    return { amount, unit: overdueAfterUnit };
-  }
-
   // Pre-fills every field a schedule template carries, plus a suggested Date the
   // user can still change before saving — see suggestStartDate.ts.
   function applyScheduleTemplate(scheduleTemplateId: string) {
@@ -96,7 +86,7 @@ export function ChoreScheduleForm({
   // already applies when saving the schedule itself — there is no separate
   // dayOfMonth field/state to keep in sync.
   function buildScheduleTemplateInput(name: string): CreateScheduleTemplateInput | null {
-    const overdueAfter = buildOverdueAfter();
+    const overdueAfter = buildOverdueAfter(overdueAfterAmount, overdueAfterUnit);
     switch (recurrenceType) {
       case 'every_n_days':
         return { recurrenceType, name, startTime, intervalDays, overdueAfter };
@@ -118,7 +108,7 @@ export function ChoreScheduleForm({
 
   function buildScheduleInput(): ScheduleInput | undefined {
     if (!startDate) return undefined;
-    const overdueAfter = buildOverdueAfter();
+    const overdueAfter = buildOverdueAfter(overdueAfterAmount, overdueAfterUnit);
 
     switch (recurrenceType) {
       case 'once':
@@ -251,27 +241,12 @@ export function ChoreScheduleForm({
 
       <FormField label="At" name="scheduleStartTime" type="time" value={startTime} onChange={setStartTime} required />
 
-      <label className="schedule-field">
-        Become overdue if still to-do after
-        <div className="overdue-after-inputs">
-          <input
-            type="number"
-            min={1}
-            max={999}
-            placeholder="No timer"
-            value={overdueAfterAmount}
-            onChange={(event) => setOverdueAfterAmount(event.target.value)}
-          />
-          <select
-            value={overdueAfterUnit}
-            onChange={(event) => setOverdueAfterUnit(event.target.value as OverdueAfterUnit)}
-          >
-            <option value="minutes">Minutes</option>
-            <option value="hours">Hours</option>
-            <option value="days">Days</option>
-          </select>
-        </div>
-      </label>
+      <OverdueAfterField
+        amount={overdueAfterAmount}
+        unit={overdueAfterUnit}
+        onAmountChange={setOverdueAfterAmount}
+        onUnitChange={setOverdueAfterUnit}
+      />
 
       {recurrenceType !== 'once' && (
         <label className="schedule-field schedule-save-as-template">

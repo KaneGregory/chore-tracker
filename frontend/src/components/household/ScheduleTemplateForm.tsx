@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { CreateScheduleTemplateInput, ScheduleTemplateRecurrenceType } from '../../types/scheduleTemplate';
 import type { OverdueAfterUnit } from '../../types/schedule';
 import { FormField } from '../common/FormField';
+import { buildOverdueAfter, OverdueAfterField } from '../common/OverdueAfterField';
 
 interface ScheduleTemplateFormProps {
   submitting: boolean;
@@ -34,19 +35,11 @@ export function ScheduleTemplateForm({ submitting, onSubmit }: ScheduleTemplateF
     });
   }
 
-  function buildOverdueAfter(): { amount: number; unit: OverdueAfterUnit } | undefined {
-    const trimmed = overdueAfterAmount.trim();
-    if (!trimmed) return undefined;
-    const amount = Number(trimmed);
-    if (!Number.isInteger(amount) || amount < 1) return undefined;
-    return { amount, unit: overdueAfterUnit };
-  }
-
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    const overdueAfter = buildOverdueAfter();
+    const overdueAfter = buildOverdueAfter(overdueAfterAmount, overdueAfterUnit);
 
     switch (recurrenceType) {
       case 'every_n_days':
@@ -146,27 +139,12 @@ export function ScheduleTemplateForm({ submitting, onSubmit }: ScheduleTemplateF
 
       <FormField label="At" name="scheduleTemplateStartTime" type="time" value={startTime} onChange={setStartTime} required />
 
-      <label className="schedule-field">
-        Become overdue if still to-do after
-        <div className="overdue-after-inputs">
-          <input
-            type="number"
-            min={1}
-            max={999}
-            placeholder="No timer"
-            value={overdueAfterAmount}
-            onChange={(event) => setOverdueAfterAmount(event.target.value)}
-          />
-          <select
-            value={overdueAfterUnit}
-            onChange={(event) => setOverdueAfterUnit(event.target.value as OverdueAfterUnit)}
-          >
-            <option value="minutes">Minutes</option>
-            <option value="hours">Hours</option>
-            <option value="days">Days</option>
-          </select>
-        </div>
-      </label>
+      <OverdueAfterField
+        amount={overdueAfterAmount}
+        unit={overdueAfterUnit}
+        onAmountChange={setOverdueAfterAmount}
+        onUnitChange={setOverdueAfterUnit}
+      />
 
       <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
         {submitting ? 'Saving…' : 'Save schedule'}

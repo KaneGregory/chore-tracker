@@ -6,7 +6,7 @@ import * as scheduleTemplateApi from '../api/scheduleTemplateApi';
 import { ApiError } from '../api/httpClient';
 import type { ScheduleTemplate } from '../types/scheduleTemplate';
 import { formatWeekdays } from '../utils/weekdayLabels';
-import { formatOverdueAfter } from '../utils/overdueAfterLabel';
+import { composeScheduleSummary } from '../utils/overdueAfterLabel';
 
 const RECURRENCE_LABEL: Record<ScheduleTemplate['recurrenceType'], (template: ScheduleTemplate) => string> = {
   every_n_days: (template) => `Every ${template.intervalDays} day(s) at ${template.startTime}`,
@@ -121,11 +121,7 @@ export function SchedulesPage() {
                 )}
                 <div className="chore-schedule-control">
                   <span className="chore-schedule-summary">
-                    {(() => {
-                      const base = RECURRENCE_LABEL[template.recurrenceType](template);
-                      const overdueSuffix = formatOverdueAfter(template.overdueAfter);
-                      return overdueSuffix ? `${base} · ${overdueSuffix}` : base;
-                    })()}
+                    {composeScheduleSummary(RECURRENCE_LABEL[template.recurrenceType](template), template.overdueAfter)}
                   </span>
                 </div>
               </li>
