@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ChoresList } from './ChoresList';
+import { ChoresByZoneList } from './ChoresByZoneList';
 import { ErrorBanner } from '../common/ErrorBanner';
 import * as zoneApi from '../../api/zoneApi';
 import * as choreApi from '../../api/choreApi';
@@ -9,20 +10,24 @@ import * as scheduleApi from '../../api/scheduleApi';
 import * as scheduleTemplateApi from '../../api/scheduleTemplateApi';
 import { ApiError } from '../../api/httpClient';
 import { flattenZones } from '../../utils/zoneTree';
-import { filterChores } from '../../utils/choreFilter';
+import { filterChores, filterByStatus } from '../../utils/choreFilter';
 import { BulkScheduleBar } from './BulkScheduleBar';
 import type { Household, HouseholdMember } from '../../types/auth';
 import type { Zone } from '../../types/zone';
-import type { Chore, ChoreFilter, SettableChoreStatus } from '../../types/chore';
+import type { Chore, ChoreFilter, ChoreGroupBy, ChoreStatus, SettableChoreStatus } from '../../types/chore';
 import type { Schedule, ScheduleInput, ScheduleWithTarget } from '../../types/schedule';
 import type { CreateScheduleTemplateInput, ScheduleTemplate } from '../../types/scheduleTemplate';
 
 export function HouseholdCard({
   household,
   filter,
+  statuses,
+  groupBy,
 }: {
   household: Household;
   filter: ChoreFilter;
+  statuses: Set<ChoreStatus>;
+  groupBy: ChoreGroupBy;
 }) {
   const { state } = useAuth();
   const [zoneTree, setZoneTree] = useState<Zone | null>(null);
@@ -334,6 +339,45 @@ export function HouseholdCard({
     scheduleByTarget.has(key),
   );
 
+  let choresListElement = null;
+  if (chores && zoneTree) {
+    const visible = filterByStatus(filterChores(chores, filter, state.user.id), statuses);
+    const sharedProps = {
+      zoneNameById: new Map(flattenZones(zoneTree).map((zone) => [zone.id, zone.name])),
+      members,
+      currentUserId: state.user.id,
+      isHead,
+      assigningKey,
+      onAssign: (choreId: number, userId: number, zoneId: number | null) =>
+        void handleAssign(choreId, userId, zoneId),
+      unassigningId,
+      onUnassign: (choreId: number, assignmentId: number) => void handleUnassign(choreId, assignmentId),
+      statusUpdatingKey,
+      onSetStatus: (choreId: number, zoneId: number | null, status: SettableChoreStatus) =>
+        void handleSetStatus(choreId, zoneId, status),
+      removingChoreId,
+      onRemove: (choreId: number) => void handleRemoveChore(choreId),
+      scheduleByTarget,
+      scheduleSubmittingKey,
+      onSetSchedule: (choreId: number, zoneId: number | null, input: ScheduleInput) =>
+        void handleSetSchedule(choreId, zoneId, input),
+      onRemoveSchedule: (choreId: number, zoneId: number | null) => void handleRemoveSchedule(choreId, zoneId),
+      scheduleTemplates,
+      onSaveAsScheduleTemplate: (input: CreateScheduleTemplateInput) =>
+        void handleSaveAsScheduleTemplate(input),
+      selectedTargets,
+      onToggleTarget: handleToggleTarget,
+      onSetZoneGroupSelected: handleSetZoneGroupSelected,
+    };
+
+    choresListElement =
+      groupBy === 'zone' ? (
+        <ChoresByZoneList entries={visible} allChoresCount={chores.length} {...sharedProps} />
+      ) : (
+        <ChoresList chores={visible} allChoresCount={chores.length} {...sharedProps} />
+      );
+  }
+
   return (
     <>
       <ErrorBanner message={zoneError ?? choresError ?? assignError} />
@@ -352,33 +396,7 @@ export function HouseholdCard({
             onApply={(input) => handleBulkApplySchedule(input)}
             onSaveAsScheduleTemplate={(input) => void handleSaveAsScheduleTemplate(input)}
           />
-          <ChoresList
-            chores={filterChores(chores, filter, state.user.id)}
-            allChoresCount={chores.length}
-            zoneNameById={new Map(flattenZones(zoneTree).map((zone) => [zone.id, zone.name]))}
-            members={members}
-            currentUserId={state.user.id}
-            isHead={isHead}
-            assigningKey={assigningKey}
-            onAssign={(choreId, userId, zoneId) => void handleAssign(choreId, userId, zoneId)}
-            unassigningId={unassigningId}
-            onUnassign={(choreId, assignmentId) => void handleUnassign(choreId, assignmentId)}
-            statusUpdatingKey={statusUpdatingKey}
-            onSetStatus={(choreId, zoneId, status) =>
-              void handleSetStatus(choreId, zoneId, status)
-            }
-            removingChoreId={removingChoreId}
-            onRemove={(choreId) => void handleRemoveChore(choreId)}
-            scheduleByTarget={scheduleByTarget}
-            scheduleSubmittingKey={scheduleSubmittingKey}
-            onSetSchedule={(choreId, zoneId, input) => void handleSetSchedule(choreId, zoneId, input)}
-            onRemoveSchedule={(choreId, zoneId) => void handleRemoveSchedule(choreId, zoneId)}
-            scheduleTemplates={scheduleTemplates}
-            onSaveAsScheduleTemplate={(input) => void handleSaveAsScheduleTemplate(input)}
-            selectedTargets={selectedTargets}
-            onToggleTarget={handleToggleTarget}
-            onSetZoneGroupSelected={handleSetZoneGroupSelected}
-          />
+          {choresListElement}
         </>
       ) : (
         !choresError && <p className="members-loading">Loading chores…</p>
